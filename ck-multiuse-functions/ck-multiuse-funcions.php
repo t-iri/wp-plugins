@@ -46,8 +46,8 @@ function ckmf_get_pager($args=array()){
 	extract($args);
 
 	$total_posts = (int)$the_query->found_posts;
-	$paged = (int)$the_query->get($paged_key) > 0;
-	$paged =  $paged ? $paged : 1;
+	$paged = (int)$the_query->get($paged_key);
+	$paged =  $paged > 0 ? $paged : 1;
 	$per_page = (int)$the_query->get('posts_per_page');
 	$max_page = intval(ceil($total_posts / $per_page));
 	if(!$max_page) return '';
