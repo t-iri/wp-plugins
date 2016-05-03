@@ -46,8 +46,9 @@ function ckmf_get_pager($args=array()){
 	extract($args);
 
 	$total_posts = (int)$the_query->found_posts;
-	$paged = ( (int)get_query_var($paged_key) > 0 ) ? (int)get_query_var($paged_key) : 1;
-	$per_page = (int)get_query_var('posts_per_page');
+	$paged = (int)$the_query->get($paged_key) > 0;
+	$paged =  $paged ? $paged : 1;
+	$per_page = (int)$the_query->get('posts_per_page');
 	$max_page = intval(ceil($total_posts / $per_page));
 	if(!$max_page) return '';
 
@@ -310,7 +311,7 @@ if(defined('CKMF_USE_SHORTCODE') && CKMF_USE_SHORTCODE === true){
  *****************************************************************/
 function ckmf_trim($v){
 	if(!empty($v)){
-		$v = preg_replace("/(^[ 　\s]+)|([ 　\s]+$)/u", "", $v);
+		$v = preg_replace("/(^[ ﾂ　\s]+)|([ ﾂ　\s]+$)/u", "", $v);
 	}
 	if(empty($v) && !is_numeric($v)){
 		return "";
