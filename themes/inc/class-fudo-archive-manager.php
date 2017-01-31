@@ -6,8 +6,7 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 		'per' => array(20, 40, 60), 
 		'ordby' => array(
 			array(
-				'orderby' => 'date', 
-				'order' => 'DESC', 
+				'orderby' => array('date' => "DESC", "ID" => "DESC"), 
 				'display' => '新着順', 
 			), 
 			array(
@@ -299,6 +298,17 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 				), 
 			), 
 		), 
+		'kaiin' => array(
+			'meta_keys' => array('kaiin'), 
+			'itype' => 'checkbox', 
+			'dtype' => 'integer', 
+			'values' => array(
+				array(
+					'display' => '会員限定', 
+					array( 'compare' => '=', 'val' => 1 ), 
+				), 
+			), 
+		), 
 	);
 	protected $search_fixed_values = array(
 		'kakaku' => array(
@@ -473,23 +483,28 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 		}
 
 		$set_val = $this->get_appropriate_query_val($query, $this->ordby_request_key);
-		if( $this->is_valid_arr($set_val) ){
-			$ordby = $this->get_str_if_isset($set_val, 'orderby');
-			$order = $this->get_str_if_isset($set_val, 'order');
+		if( !$this->is_valid_arr($set_val) ) return;
 
-			$ordby = explode('/', $ordby);
-			if( 'meta' === $ordby[0] && isset($ordby[1]) ){
+		$ordby = $this->get_if_isset($set_val, 'orderby');
+		$order = $this->get_str_if_isset($set_val, 'order');
 
-				$meta_type = $this->get_str_if_isset($set_val, 'meta_type');
-				$meta_type = ( $meta_type ) ? $meta_type : 'NUMERIC';
-				$this->set_query_meta_orderby($query, $ordby[1], $order, $meta_type);
+		if( is_array($ordby) ){
+			$query->set('orderby', $ordby);
+			return;
+		}
 
-			} else {
+		$ordby = explode('/', (string)$ordby);
+		if( 'meta' === $ordby[0] && isset($ordby[1]) ){
 
-				$query->set('orderby', $ordby[0]);
-				$query->set('order', $order);
+			$meta_type = $this->get_str_if_isset($set_val, 'meta_type');
+			$meta_type = ( $meta_type ) ? $meta_type : 'NUMERIC';
+			$this->set_query_meta_orderby($query, $ordby[1], $order, $meta_type);
 
-			}
+		} else {
+
+			$query->set('orderby', $ordby[0]);
+			$query->set('order', $order);
+
 		}
 	}
 
@@ -1245,6 +1260,10 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 		}
 
 		return $values;
+	}
+
+	public function get_search_component_bukken_shubetsu_values(){
+		return $this->get_bukken_shubetsu_dynamic_values( array() );
 	}
 
 	protected function get_fudo_middle_area_name($id){

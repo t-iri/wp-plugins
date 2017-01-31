@@ -572,30 +572,34 @@ abstract class myUscesItemCtrlAbstract {
 
 		add_filter('category_template', array($this, 'category_item_template'));
 		add_filter('archive_template', array($this, 'archive_item_template'));
+		add_filter('search_template', array($this, 'search_item_template'));
 	}
 
-	function category_item_template($template) {
-	//Specific templates for item archives & item search page
-		$category_id = get_query_var('cat');
-		$parent_ids = get_ancestors($category_id, 'category');
-		$parent_slugs = array();
-		foreach( $parent_ids as $parent_id ){
-			$parent = get_category($parent_id);
-			$parent_slugs[] = $parent->slug;
-		}
-
-		if( in_array('item', $parent_slugs) || is_category('item') ){
+	public function category_item_template($template) {
+	//Specific templates for item archives
+		$category_id = get_query_var('cat', 0);
+		if( $this->is_cat_of_item($category_id) ){
 			$template = $this->get_item_template();
 		}
 		return $template;
 	}
-	function archive_item_template($template){
+
+	public function archive_item_template($template){
 		if( $this->is_item_tax() ){
 			$template = $this->get_item_template();
 		}
 		return $template;
 	}
-	function get_item_template(){
+
+	public function search_item_template($template) {
+	//Specific templates for item search page
+		if( $this->is_cat_of_item() ){
+			$template = $this->get_item_template();
+		}
+		return $template;
+	}
+
+	protected function get_item_template(){
 		return get_stylesheet_directory() . '/' . $this->item_archive_template_name;
 	}
 
