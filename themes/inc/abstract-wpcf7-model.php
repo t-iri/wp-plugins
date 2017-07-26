@@ -1,5 +1,5 @@
 <?php 
-class myWpcfModel {
+class MyWpcf7Model {
 	protected $onoff = true; //使用する => true, 使用しない => false
 	protected $form_ids = array(); //適用コンタクトフォームID
 	protected $current_form_id; //適用中コンタクトフォームID
