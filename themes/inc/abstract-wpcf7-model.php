@@ -52,7 +52,7 @@ class MyWpcf7Model {
 		if( !$exec ) return $tag;
 
 		$wpcf7_key = $tag['name'];
-		$tag = $this->own_filter_wpcf7_form_tag_at_exec_all_wpcf($tag, $wpfc7_key);
+		$tag = $this->own_filter_wpcf7_form_tag_at_exec_all_wpcf($tag, $wpcf7_key);
 
 		return $tag;
 	}
@@ -66,7 +66,7 @@ class MyWpcf7Model {
 		if( !$exec ) return $tag;
 
 		$wpcf7_key = $tag['name'];
-		$tag = $this->own_filter_wpcf7_form_tag_at_exec_particular_wpcf($tag, $wpfc7_key);
+		$tag = $this->own_filter_wpcf7_form_tag_at_exec_particular_wpcf($tag, $wpcf7_key);
 
 		return $tag;
 	}
