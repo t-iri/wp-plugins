@@ -131,6 +131,10 @@ class myFudoBukkenManager extends myBaseFunctionsWP {
 				$val = 'ご成約済';
 				if( !$meta_val ){
 					$val = $this->call_fudo_func_with_wrapping_ob('my_custom_kakaku_print', $post_id);
+					$kakaku_int = preg_match("/(\d+)[^\d]/u", $val, $mt) ? (int)$mt[1] : '';
+					if( $kakaku_int ){
+						$val = str_replace($kakaku_int, number_format($kakaku_int), $val);
+					}
 				}
 				break;
 
@@ -296,17 +300,22 @@ class myFudoBukkenManager extends myBaseFunctionsWP {
 		if( $min > $max ) return $gazos;
 
 		$plugin_url = WP_PLUGIN_URL;
-		$src_kaiin = "{$plugin_url}/fudou/img/kaiin.jpg";
-		$src_nowprint = "{$plugin_url}/fudou/img/nowprinting.jpg";
+		$src_kaiin = "/images/kaiin.png";
+		if( file_exists( get_stylesheet_directory() . $src_kaiin ) ){
+			$src_kaiin = get_stylesheet_directory_uri() . $src_kaiin;
+		} else {
+			$src_kaiin = "{$plugin_url}/fudou/img/kaiin.jpg";
+		}
+
+		$src_nowprint = "/images/nowprinting.png";
+		if( file_exists( get_stylesheet_directory() . $src_nowprint ) ){
+			$src_nowprint = get_stylesheet_directory_uri() . $src_nowprint;
+		} else {
+			$src_nowprint = "{$plugin_url}/fudou/img/nowprinting.jpg";
+		}
 
 		$is_gazo_viewable = $this->is_the_fudo_item_viewable("gazo", $post);
 		$kaiin_img = '<img src="'.$src_kaiin.'" alt="" />';
-
-		//サムネイル画像
-		$img_path = get_option('upload_path');
-		if( !$img_path ){
-			$img_path = 'wp-content/uploads';
-		}
 
 		global $wpdb;
 		$a_fmt = '<a href="%1$s" rel="lightbox[%2$s] lytebox[%2$s]" title="%3$s">%4$s</a>';
@@ -319,7 +328,13 @@ class myFudoBukkenManager extends myBaseFunctionsWP {
 			$img_alt = $img_comment . my_custom_fudoimgtype_print($img_alt);
 
 			if( !$img_name ){
-				$image = ( $only_exist ) ? '' : sprintf($img_fmt, $src_nowprint, "", "");
+				$image = '';
+				if( !$only_exist ){
+					$image = $kaiin_img;
+					if( $is_gazo_viewable ){
+						$image = sprintf($img_fmt, $src_nowprint, "", "");
+					}
+				}
 				$gazos[$img_id] = $image;
 				continue;
 			}
@@ -347,7 +362,13 @@ class myFudoBukkenManager extends myBaseFunctionsWP {
 
 			$attachmentid = ( $metas ) ? $metas->ID : '';
 			if( !$attachmentid ){
-				$image = ( $only_exist ) ? '' : sprintf($img_fmt, $src_nowprint, $img_name, "");
+				$image = '';
+				if( !$only_exist ){
+					$image = $kaiin_img;
+					if( $is_gazo_viewable ){
+						$image = sprintf($img_fmt, $src_nowprint, $img_name, "");
+					}
+				}
 				$gazos[$img_id] = $image;
 				continue;
 			}

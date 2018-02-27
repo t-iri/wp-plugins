@@ -23,13 +23,13 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 				'orderby' => 'meta/kakakuhyorimawari', 
 				'order' => 'DESC', 
 				'display' => '利回りの高い順', 
-				'meta_type' => 'DECIMAL', 
+				'meta_type' => 'DECIMAL(10,3)', 
 			), 
 			array(
 				'orderby' => 'meta/kakakuhyorimawari', 
 				'order' => 'ASC', 
 				'display' => '利回りの低い順', 
-				'meta_type' => 'DECIMAL', 
+				'meta_type' => 'DECIMAL(10,3)', 
 			), 
 			array(
 				'orderby' => 'meta/tatemonochikunenn', 
@@ -200,12 +200,10 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 					'display' => '木造', 
 					array( 'compare' => '=', 'val' => 1 ), 
 				), 
-/* 
 				array(
 					'display' => 'ブロック', 
 					array( 'compare' => '=', 'val' => 2 ), 
 				), 
- */
 				array(
 					'display' => '鉄骨造', 
 					array( 'compare' => '=', 'val' => 3 ), 
@@ -218,46 +216,34 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 					'display' => 'SRC', 
 					array( 'compare' => '=', 'val' => 5 ), 
 				), 
-/* 
 				array(
 					'display' => 'PC', 
 					array( 'compare' => '=', 'val' => 6 ), 
 				), 
- */
-/* 
 				array(
 					'display' => 'HPC', 
 					array( 'compare' => '=', 'val' => 7 ), 
 				), 
- */
-				array(
-					'display' => 'その他', 
-					array( 'compare' => '=', 'val' => 9 ), 
-				), 
-/* 
 				array(
 					'display' => '軽量鉄骨', 
 					array( 'compare' => '=', 'val' => 10 ), 
 				), 
- */
-/* 
+				array(
+					'display' => 'その他', 
+					array( 'compare' => '=', 'val' => 9 ), 
+				), 
 				array(
 					'display' => 'ALC', 
 					array( 'compare' => '=', 'val' => 11 ), 
 				), 
- */
-/* 
 				array(
 					'display' => '鉄筋ブロック', 
 					array( 'compare' => '=', 'val' => 12 ), 
 				), 
- */
-/* 
 				array(
 					'display' => 'CFT(コンクリート充填鋼管)', 
 					array( 'compare' => '=', 'val' => 13 ), 
 				), 
- */
 			), 
 		), 
 		'tmenseki' => array(
@@ -412,7 +398,7 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 
 		global $work_bukkenshubetsu;
 		$shubetsu_group = $this->fudo_shubetsu_group;
-		if( !$work_bukkenshubetsu || !$shubetsu_group ) return;
+		if( is_admin() || !$work_bukkenshubetsu || !$shubetsu_group ) return;
 
 		foreach( $work_bukkenshubetsu as $id => $values ){
 			foreach( $shubetsu_group as $group_name => $ids ){
@@ -1477,7 +1463,7 @@ class myFudoArchiveManager extends myBaseFunctionsWP {
 		$data_types = array(
 			'integer' => 'UNSIGNED', 
 			'string' => 'CHAR', 
-			'float' => 'DECIMAL', 
+			'float' => 'DECIMAL(10,3)', 
 			'date' => 'DATE', 
 		);
 		$type = $this->get_str_if_isset($data_types, $type);
