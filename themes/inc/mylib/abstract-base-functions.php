@@ -6,96 +6,118 @@ abstract class myBaseFunctions {
 	}
 
 	protected function is_in_or_eq_value($needle, $haystack){
-		$bool = ( 
+		return ( 
 			( is_array($haystack) && in_array($needle, $haystack, true) ) 
 			|| ( $needle === $haystack ) 
 		) ? true : false;
-		return $bool;
+	}
+
+/*************** Functions ***************/
+	protected function safe_call_func($func, $args=array()){
+		if( function_exists($func) ){
+			if( $args ){
+				if( !is_array($args) ) $args = array($args);
+				return call_user_func_array($func, $args);
+			}
+			return call_user_func($func);
+		}
+		return false;
 	}
 
 /*************** Object ***************/
 	protected function call_the_object_method($obj, $func, $args=array()){
-		$res = false;
 		if( is_object($obj) && method_exists($obj, $func) ){
-			if($args){
-				$args = ( !is_array($args) ) ? array($args) : $args;
-				$res = call_user_func_array(array($obj, $func), $args);
-			} else {
-				$res = call_user_func(array($obj, $func));
+			if( $args ){
+				if( !is_array($args) ) $args = array($args);
+				return call_user_func_array( array($obj, $func), $args );
 			}
+			return call_user_func( array($obj, $func) );
 		}
-		return $res;
+		return false;
 	}
 
 	protected function get_the_object_property($obj, $key){
-		$property = ( is_object($obj) && property_exists($obj, $key) ) ? $obj->$key : NULL;
-		return $property;
+		return ( is_object($obj) && property_exists($obj, $key) ) ? $obj->$key : NULL;
 	}
 
 	protected function get_the_object_list_properties($tgt, $key){
 		$args = array_fill(0, count($tgt), $key);
-		$list_properties = array_map( array($this, "get_the_object_property"), $tgt, $args );
-		return $list_properties;
+		return array_map( array($this, 'get_the_object_property'), $tgt, $args );
 	}
 
 /*************** HTML ***************/
 	protected function make_cls_attr($str){
 		return $this->make_attr('class', $str);
 	}
+
 	protected function make_name_attr($str){
 		return $this->make_attr('name', $str);
 	}
-	protected function make_attr($attr, $str){
-		$attr_fmt = ' %s="%s"';
-		return sprintf($attr_fmt, $attr, $str);
+
+	protected function make_attr($attr, $str=''){
+		if( is_string($attr) ){
+			if( is_array($str) ) $str = implode( ' ', array_filter($str) );
+			return sprintf(' %s="%s"', $attr, $str);
+		}
+		$single_str = '';
+		if( is_array($attr) ){
+			foreach( $attr as $k => $v ){
+				$single_str .= $this->make_attr($k, $v);
+			}
+		}
+		return $single_str;
 	}
+
 	protected function make_prop($str){
-		$prop_fmt = ' %1$s="%1$s"';
-		return sprintf($prop_fmt, $str);
+		if( is_string($str) ){
+			return sprintf(' %1$s="%1$s"', $str);
+		}
+		$single_str = '';
+		if( is_array($str) ){
+			foreach( $str as $v ){
+				$single_str .= $this->make_prop($v);
+			}
+		}
+		return $single_str;
 	}
+
 	protected function make_a_tag($href, $attr, $str){
-		$a_fmt = '<a href="%s"%s>%s</a>';
-		return sprintf($a_fmt, $href, $attr, $str);
+		return sprintf('<a href="%s"%s>%s</a>', $href, $attr, $str);
 	}
+
 	protected function make_img_tag($src, $alt, $attr){
-		$img_fmt = '<img src="%s" alt="%s"%s>';
-		return sprintf($img_fmt, $src, $alt, $attr);
+		return sprintf('<img src="%s" alt="%s"%s>', $src, $alt, $attr);
 	}
+
 	protected function make_ipt_tag($type, $value='', $attr=''){
 		if( is_array($type) ){
-			foreach($type as $k => $v){
+			foreach( $type as $k => $v ){
 				$type[$k] = $this->make_attr($k, $v);
 			}
 			$type = implode($type, " ");
-			$ipt_fmt = '<input%s>';
-			$ipt = sprintf($ipt_fmt, $type);
-		} else {
-			$ipt_fmt = '<input type="%s" value="%s"%s>';
-			$ipt = sprintf($ipt_fmt, $type, $value, $attr);
+			return sprintf('<input%s>', $type);
 		}
-		return $ipt;
+		return sprintf('<input type="%s" value="%s"%s>', $type, $value, $attr);
 	}
+
 	protected function make_html_tag($tag, $attr, $str){
-		$ele_fmt = '<%1$s%2$s>%3$s</%1$s>';
-		return sprintf($ele_fmt, $tag, $attr, $str);
+		return sprintf('<%1$s%2$s>%3$s</%1$s>', $tag, $attr, $str);
 	}
 
 /*************** validate convert ***************/
 	protected function convert_eol($val, $to="\n"){
 		$eol = array("\r\n", "\r", "\n");
-		if( "" === $to ){
-			$val = is_string($val) ? str_replace($eol, "", $val) : "";
-			return $val;
+		if( '' === $to ){
+			return is_string($val) ? str_replace($eol, '', $val) : '';
 		}
 		$eol = in_array($to, $eol, true) ? array_fill_keys($eol, $to) : array();
-		$val = ( is_string($val) && $eol ) ? strtr($val, $eol) : "";
-		return $val;
+		return ( is_string($val) && $eol ) ? strtr($val, $eol) : '';
 	}
 
 	protected function trim($val){
 		$v = '';
 		if( is_string($val) || is_numeric($val) ){
-			$v = preg_replace("/(^[ 　\s]+)|([ 　\s]+$)/u", "", $val);
+			$v = preg_replace("/(^[ 　\s]+)|([ 　\s]+$)/u", '', $val);
 		}
 		return $v;
 	}
@@ -103,18 +125,23 @@ abstract class myBaseFunctions {
 	protected function validate_str($val){
 		return $this->validate($val, 'str');
 	}
+
 	protected function is_valid_str($val){
 		return $this->validate($val, 'str', true);
 	}
+
 	protected function validate_arr($val){
 		return $this->validate($val, 'arr');
 	}
+
 	protected function is_valid_arr($val){
 		return $this->validate($val, 'arr', true);
 	}
+
 	protected function validate_int($val){
 		return $this->validate($val, 'int');
 	}
+
 	protected function is_valid_int($val){
 		return $this->validate($val, 'int', true);
 	}
@@ -126,25 +153,20 @@ abstract class myBaseFunctions {
 				$val = ( 
 					( is_string($val) && !empty($val) ) 
 					|| is_numeric($val) 
-				) ? (string)$val : "";
-
-				if( $change_bool ){
-					$val = ( $val !== "" ) ? true : false;
-				}
+				) ? (string)$val : '';
+				if( $change_bool ) $val = ( $val !== '' ) ? true : false;
 				break;
+
 			case 'arr':
 			case 'array':
 				$val = ( is_array($val) && !empty($val) ) ? $val : array();
-				if( $change_bool ){
-					$val = ( $val ) ? true : false;
-				}
+				if( $change_bool ) $val = ( $val ) ? true : false;
 				break;
+
 			case 'int':
 			case 'integer':
 				$val = ( is_numeric($val) && !empty($val) ) ? (int)$val : 0;
-				if( $change_bool ){
-					$val = ( $val ) ? true : false;
-				}
+				if( $change_bool ) $val = ( $val ) ? true : false;
 				break;
 		}
 		return $val;
@@ -152,35 +174,36 @@ abstract class myBaseFunctions {
 
 /*************** Array ***************/
 	protected function get_str_if_isset($args, $key){
-		$val = $this->get_if_isset($args, $key, "string");
-		return $val;
+		return $this->get_if_isset($args, $key, 'string');
 	}
+
 	protected function get_arr_if_isset($args, $key){
-		$val = $this->get_if_isset($args, $key, "array");
-		return $val;
+		return $this->get_if_isset($args, $key, 'array');
 	}
+
 	protected function get_int_if_isset($args, $key){
-		$val = $this->get_if_isset($args, $key, "integer");
-		return $val;
+		return $this->get_if_isset($args, $key, 'integer');
 	}
+
 	protected function get_float_if_isset($args, $key){
-		$val = $this->get_if_isset($args, $key, "float");
-		return $val;
+		return $this->get_if_isset($args, $key, 'float');
 	}
+
 	protected function get_number_if_isset($args, $key){
 		$val = $this->get_str_if_isset($args, $key);
-		$val = preg_match( "/^(\d+)$/u", mb_convert_kana($val, 'n') ) ? $val : "";
-		return $val;
+		return preg_match( "/^(\d+)$/u", mb_convert_kana($val, 'n') ) ? $val : '';
 	}
-	protected function get_if_isset($args, $key, $fmt=""){
-		if( in_array( $fmt, array("number"), true ) ){
+
+	protected function get_if_isset($args, $key, $fmt=''){
+		if( in_array( $fmt, array('number'), true ) ){
 			return $this->get_number_if_isset($args, $key);
 		}
 
 		$val = ( is_array($args) && isset($args[$key]) ) ? $args[$key] : NULL;
-		if( "" !== (string)$fmt ){
-			settype($val, $fmt);
-		}
+		if( '' === (string)$fmt ) return $val;
+		if( 'string' === $fmt && is_array($val) ) return '';
+
+		settype($val, $fmt);
 		return $val;
 	}
 
@@ -189,18 +212,17 @@ abstract class myBaseFunctions {
 		return (bool)( array_filter( array_keys($arr), 'is_int' ) );
 	}
 
-	protected function recursive_parse_args( $a, $b, $only_isset=false ) {
-		$a = (array) $a;
-		$b = (array) $b;
-		$result = $a;
-		foreach ( $b as $k => $v ) {
-			if ( $only_isset && !isset($result[$k]) ) continue;
+	protected function recursive_parse_args($def, $add, $only_isset=false){
+		$result = $def;
+		if( !is_array($def) || !is_array($add) ) return $result;
 
-			if ( is_array($v) && isset($result[$k] ) ) {
-				$result[$k] = $this->recursive_parse_args( $v, $result[$k], $only_isset );
-			} else {
-				$result[$k] = $v;
+		foreach( $add as $k => $v ){
+			if( $only_isset && !isset($result[$k]) ) continue;
+
+			if( is_array($v) && ( isset($result[$k]) && is_array($result[$k]) ) ){
+				$v = $this->recursive_parse_args( $result[$k], $v, $only_isset );
 			}
+			$result[$k] = $v;
 		}
 		return $result;
 	}
@@ -228,9 +250,7 @@ abstract class myBaseFunctions {
 			$_arr[$k] = $arr[$k];
 			unset($arr[$k]);
 		}
-		$arr = array_merge($_arr, $arr);
-
-		return $arr;
+		return array_merge($_arr, $arr);
 	}
 
 /*************** PHP compatible ***************/
