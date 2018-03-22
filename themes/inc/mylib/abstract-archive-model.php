@@ -24,7 +24,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 	/*** 
 		%key% => array(
 			'meta_keys' => array(%meta_key%), 
-			'tax_query' => %taxonomy%/%term% or %taxonomy%, //'category/fish' or 'fish'
+			'tax_query' => %taxonomy%/%term% or %taxonomy%, //'category/fish' or 'category'
 			'itype' => %input_type%, 
 			'dtype' => %data_type%, 
 			'values' => array(
@@ -33,7 +33,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 					array(
 						'key' => %key%, 
 						'compare' => '', 
-						'val' => mixed, 
+						'val' => (mixed), 
 					), 
 				), 
 			), 
@@ -42,6 +42,8 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 			'ipt_args' => array(
 				//see get_archive_input_html() $defaults
 			), 
+			'use_term_route' => (bool), //available if set also 'tax_query' 
+			'values_relation' => 'OR' or 'AND', 
 		), 
 	 ***/
 	);
@@ -57,10 +59,16 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 	protected $use_search_redirect_if_single_term_search = false;
 	protected $use_display_count = false;
 
+/* cancel hook in case not having force_search_arg even if set true */
+	protected $hook_pgp_also_sub_queries = false;
+
 	private $ignoring_force_search_arg = false;
 	private $searched_words = array();
 	private $requested_values = array();
 	private $current_searching_type = '';
+
+	private $allow_term_route_keys = array();
+	private $current_term_routes = array();
 
 	public function __construct(){
 		$this->reset_search_form_if_isset();
@@ -71,6 +79,10 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 		$str_key = (string)$str_key;
 		if( '' !== $str_key ) $any = $this->search_arr_val_deeply( $any, $str_key );
 		return $any;
+	}
+
+	protected function set_ignoring_force_search_arg($bool){
+		$this->ignoring_force_search_arg = (bool)$bool;
 	}
 
 	protected function reset_search_form_if_isset(){
@@ -138,12 +150,15 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 
 	public function hook_pre_get_posts_for_sort_and_search($query){
 		if( is_admin() ) return;
+		if( !$query->is_main_query() && !$this->hook_pgp_also_sub_queries ) return;
 		if( !$query->is_main_query() && !$this->is_having_force_search_arg($query) ) return;
 		if( $this->ignoring_force_search_arg ) return;
 
 		$this->set_archive_sort_query($query);
 		$this->set_archive_search_query($query);
 		$this->own_action_after_set_archive_query($query);
+
+		$this->set_current_term_routes();
 	}
 
 	protected function own_action_after_set_archive_query($query){
@@ -314,7 +329,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 				break;
 
 			case 'reset_search':
-				$ipt = $this->get_reset_input();
+				$ipt = $this->get_reset_input($args);
 				break;
 
 			case 'hiddens':
@@ -333,6 +348,8 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 		if( !$this->is_valid_arr($cmpnt_vals) ) return $ipt;
 
 		$defaults = array(
+			'id_prefix' => '', 
+			'id_suffix' => '', 
 			'class' => '', 
 			'value_type' => '', 
 			'display_prefix' => '', 
@@ -343,15 +360,24 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 			), 
 			'input_type' => $itype, 
 			'class_arr' => array(), 
-			'label_place' => '', 
+			'label_arr' => array(
+				'place' => '', //select, radio, checkbox
+				'text' => NULL, //select only
+				'text_wrap_span' => false, 
+				'attr_arr' => array(
+				), 
+				'before_html' => '', //only 'place' => 'wrap*'
+				'after_html' => '', //only 'place' => 'wrap*'
+			), 
 			'component_type' => 'sort', 
 		);
-		$args = $this->recursive_parse_args($defaults, $args, true);
+		$args = $this->recursive_parse_args($defaults, $args, false);
 
 		$ipt_cls = $this->get_if_isset($args, 'class');
 		$ipt_cls = is_array($ipt_cls) ? $ipt_cls : array_filter( explode(' ', $ipt_cls) );
 		$blank_ele = $this->get_arr_if_isset($args, 'blank_element');
 		$itype = $this->get_str_if_isset($args, 'input_type');
+		$label_arr = $this->get_arr_if_isset($args, 'label_arr');
 		$cmpnt_type = $this->get_str_if_isset($args, 'component_type');
 
 		$req_val = $this->get_the_appropriate_requested_val($cmpnt_type, $cmpnt_key);
@@ -407,6 +433,10 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 
 				foreach( $select_groups as $group_key => $opts ){
 					$attr = $this->make_attr('name', $iname);
+
+					$sel_id = $this->make_archive_input_id($iname, $group_key, $args);
+					$attr .= $this->make_attr('id', $sel_id);
+
 					$group_cls = $ipt_cls;
 					if( 0 !== $group_key ){
 						$group_info = explode('/', $group_key, 2);
@@ -431,7 +461,13 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 						}
 						$attr .= $this->make_cls_attr( implode(' ', $group_cls) );
 					}
-					$ipt .= $this->make_html_tag( 'select', $attr, implode("\n", $opts) );
+
+					$ieach = $this->make_html_tag( 'select', $attr, implode("\n", $opts) );
+
+					$label_arr['attr_arr']['for'] = $sel_id;
+					$ieach = $this->arrange_input_label_place($ieach, $label_arr);
+
+					$ipt .= $ieach;
 				}
 
 				$this->activate_select_script($script_keys);
@@ -440,7 +476,6 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 
 			case 'checkbox':
 			case 'radio':
-				$label_place = $this->get_str_if_isset($args, 'label_place');
 				foreach( $cmpnt_vals as $idx => $v_arr ){
 					$attr = '';
 					$ipt_val = (string)$idx;
@@ -452,14 +487,14 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 					$ipername .= ( $this->is_multi_arg_input_type($itype) ) ? '[]' : '';
 					$attr .= $this->make_attr('name', $ipername);
 
-					$chk_id = $this->make_archive_input_id($iname, $idx);
+					$chk_id = $this->make_archive_input_id($iname, $idx, $args);
 					$attr .= $this->make_attr('id', $chk_id);
 
 					$ieach = $this->make_ipt_tag($itype, $ipt_val, $attr);
 
-					$attr = $this->make_attr('for', $chk_id);
-					$disp_val = $this->make_values_display($v_arr, $args);
-					$ieach = $this->arrange_input_label_place($ieach, $attr, $disp_val, $label_place);
+					$label_arr['attr_arr']['for'] = $chk_id;
+					$label_arr['text'] = $this->make_values_display($v_arr, $args);
+					$ieach = $this->arrange_input_label_place($ieach, $label_arr);
 
 					$ipt .= $ieach;
 				}
@@ -480,11 +515,15 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 	}
 
 	protected function own_filter_request_val_at_archive_input($req_val, $cmpnt_key){
+		$req_val = $this->filter_request_val_at_archive_input_for_term_route($req_val, $cmpnt_key);
 		return $req_val;
 	}
 
-	protected function make_archive_input_id($iname, $idx){
-		$id = $iname . '__' . (string)$idx;
+	protected function make_archive_input_id($iname, $idx, $args){
+		$id_prfx = $this->get_str_if_isset($args, 'id_prefix');
+		$id_sffx = $this->get_str_if_isset($args, 'id_suffix');
+
+		$id = $id_prfx . $iname . '__' . (string)$idx . $id_sffx;
 		return $id;
 	}
 
@@ -504,32 +543,58 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 		return $disp_val;
 	}
 
-	protected function arrange_input_label_place($ipt, $lbl_attr, $lbl_val, $lbl_place){
+	protected function arrange_input_label_place($ipt, $label_arr){
+		$lbl_text = $this->get_if_isset($label_arr, 'text');
+		if( is_null($lbl_text) ) return $ipt;
+
 		$lbl_tag = 'label';
-		$span_attr = $this->make_cls_attr('lbl-txt');
-		$span_ele = $this->make_html_tag('span', $span_attr, $lbl_val);
-		switch( $lbl_place ){
-			case 'before':
-				$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $lbl_val) . $ipt;
+		$lbl_place = $this->get_str_if_isset($label_arr, 'place');
+		$lbl_attr = $this->get_arr_if_isset($label_arr, 'attr_arr');
+		$lbl_attr = ( $lbl_attr ) ? $this->make_attr($lbl_attr) : '';
+
+		$text_wrap_span = (bool)$this->get_if_isset($label_arr, 'text_wrap_span');
+		if( $text_wrap_span ){
+			$span_attr = $this->make_cls_attr('lbl-txt');
+			$lbl_text = $this->make_html_tag('span', $span_attr, $lbl_text);
+		}
+
+		$lbl_commands = explode('/', $lbl_place);
+		$first_cmmnd = $lbl_commands[0];
+		if( 'before' === $first_cmmnd ){
+			$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $lbl_text) . $ipt;
+			return $ipt;
+		}
+
+		if( 'after' === $first_cmmnd ){
+			$ipt = $ipt . $this->make_html_tag($lbl_tag, $lbl_attr, $lbl_text);
+			return $ipt;
+		}
+
+		if( 'wrap' !== $first_cmmnd ) return $ipt;
+
+		$second_cmmnd = $this->get_str_if_isset($lbl_commands, 1);
+		switch( $second_cmmnd ){
+			case 'text_out_before':
+				$ipt = $lbl_text . $this->make_html_tag($lbl_tag, $lbl_attr, $ipt);
 				break;
 
-			case 'after':
-				$ipt = $ipt . $this->make_html_tag($lbl_tag, $lbl_attr, $lbl_val);
+			case 'text_out_after':
+				$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $ipt) . $lbl_text;
 				break;
 
-			case 'wrap_span_before':
-				$lbl_val = $span_ele; /* fall through, do not break */
-			case 'wrap_before':
-				$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $lbl_val.$ipt);
+			case 'text_in_before':
+				$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $lbl_text.$ipt);
 				break;
 
-			case 'wrap_span_after':
-				$lbl_val = $span_ele; /* fall through, do not break */
-			case 'wrap_after':
+			case 'text_in_after':
 			default:
-				$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $ipt.$lbl_val);
+				$ipt = $this->make_html_tag($lbl_tag, $lbl_attr, $ipt.$lbl_text);
 				break;
 		}
+
+		if( isset($label_arr['before_html']) ) $ipt = $label_arr['before_html'] . $ipt;
+		if( isset($label_arr['after_html']) ) $ipt .= $label_arr['after_html'];
+
 		return $ipt;
 	}
 
@@ -552,7 +617,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 			$disp_val = $this->make_values_display($v_arr, $args);
 			$a_tag = $this->make_a_tag($url, $attr, $disp_val);
 
-			$li_id = $this->make_archive_input_id($iname, $idx);
+			$li_id = $this->make_archive_input_id($iname, $idx, $args);
 			$attr = $this->make_attr('id', $li_id);
 
 			$li_cls = $cls_li;
@@ -596,6 +661,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 	}
 
 	protected function own_filter_term_tree_at_level_selects($term_tree, $cmpnt_key){
+		$term_tree = $this->filter_term_tree_at_level_selects_for_term_route($term_tree, $cmpnt_key);
 		return $term_tree;
 	}
 
@@ -831,7 +897,13 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 					$this->searched_words[$cmpnt_key][] = $s_word;
 				}
 			}
-			$per_val_ids = $this->sort_arr_bahaving_as_OR_relation($per_val_ids);
+
+			$vals_relation = $this->get_str_if_isset($cmpnts, 'values_relation');
+			if( 'AND' === $vals_relation ){
+				$per_val_ids = $this->sort_arr_bahaving_as_AND_relation($per_val_ids);
+			} else {
+				$per_val_ids = $this->sort_arr_bahaving_as_OR_relation($per_val_ids);
+			}
 
 		/* behave as AND */
 			$post_in = ( !$post_in ) ? $per_val_ids : array_intersect( $post_in, $per_val_ids );
@@ -912,9 +984,9 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 			$args = $base_args;
 			$args[$q_key] = $ex_query;
 
-			$this->ignoring_force_search_arg = true;
+			$this->set_ignoring_force_search_arg(true);
 			$posts = get_posts($args);
-			$this->ignoring_force_search_arg = false;
+			$this->set_ignoring_force_search_arg(false);
 
 			if( !$posts ) continue;
 
@@ -924,7 +996,12 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 		}
 
 		if( false !== $post_ids ){
-			$post_ids = $this->sort_arr_bahaving_as_OR_relation($post_ids);
+			$vals_relation = $this->get_str_if_isset($cmpnts, 'values_relation');
+			if( 'AND' === $vals_relation ){
+				$post_ids = $this->sort_arr_bahaving_as_AND_relation($post_ids);
+			} else {
+				$post_ids = $this->sort_arr_bahaving_as_OR_relation($post_ids);
+			}
 		}
 
 		return $post_ids;
@@ -952,7 +1029,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 						'taxonomy' => ( $key_in_values ) ? $key_in_values : $ex_key, 
 						'field' => ( $d_type ) ? $d_type : 'term_id', 
 						'terms' => $vls['val'], 
-						'include_children' => false, 
+						'include_children' => isset($vls['include_children']) ? (bool)$vls['include_children'] : false, 
 						'operator' => $vls['compare'], 
 					);
 					break;
@@ -1008,6 +1085,7 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 
 			$srch_components[$cmpnt_key]['values'] = $values;
 
+			$this->set_use_term_route_key_if_exist($cmpnt_key, $cmpnts);
 		}
 
 		if( $prioritize_keys ){
@@ -1186,13 +1264,14 @@ abstract class MyArchiveModel extends MyBaseFunctionsWP {
 		return $ipt;
 	}
 
-	protected function get_reset_input(){
+	protected function get_reset_input($args=array()){
 		$iname = $this->archive_search_reset_key;
 		$ipt_args = array(
 			'type' => 'submit', 
 			'name' => $iname, 
 			'value' => 'リセット', 
 		);
+		$ipt_args = $this->recursive_parse_args($ipt_args, $args, false);
 		$ipt = $this->make_ipt_tag($ipt_args);
 		return $ipt;
 	}
@@ -1366,6 +1445,22 @@ jQuery(function($){
 		return $arr;
 	}
 
+	protected function sort_arr_bahaving_as_AND_relation($arr){
+		if( !is_array($arr) ) return false;
+		/*** 
+			you must pass two-dimensional array like below
+			$arr = array( 
+				key => array(), 
+				...
+			);
+		 ***/
+		if( $arr ){
+			$fst = array_shift($arr);
+			$arr = ( $arr ) ? array_reduce($arr, 'array_intersect', $fst) : $fst;
+		}
+		return $arr;
+	}
+
 	public function get_search_url(){
 		$url = home_url();
 		$url = add_query_arg('s', '', $url);
@@ -1400,11 +1495,15 @@ jQuery(function($){
 		add_filter( 'wp_title', array($this, 'archive_search_title') );
 		//WordPress 4.4～
 		add_filter( 'pre_get_document_title', array($this, 'archive_search_title') );
+		//WordPress
+		add_filter( 'get_the_archive_title', array($this, 'archive_search_title'), 10, 1 );
 		//All-in-One-SEO-Pack
 		add_filter( 'aioseop_title', array($this, 'archive_search_title'), 50 );
 
 		//breadcrumb
 		add_filter( 'bcn_breadcrumb_title', array($this, 'archive_search_title'), 10, 3 );
+		add_filter( 'bcn_breadcrumb_template', array($this, 'hook_breadcrumb_template'), 10, 3 );
+		add_filter( 'bcn_breadcrumb_template_no_anchor', array($this, 'hook_breadcrumb_template'), 10, 3 );
 	}
 
 	public function archive_search_title($title){
@@ -1455,6 +1554,17 @@ jQuery(function($){
 
 	protected function own_filter_searched_words_at_search_title($searched_words){
 		return $searched_words;
+	}
+
+	public function hook_breadcrumb_template($template, $types, $id){
+		$prime_type = isset($types[0]) ? $types[0] : '';
+		$has_anchor = doing_filter('bcn_breadcrumb_template') ? true : false;
+		$template = $this->own_filter_breadcrumb_template($template, $prime_type, $has_anchor, $types, $id);
+		return $template;
+	}
+
+	protected function own_filter_breadcrumb_template($template, $prime_type, $has_anchor, $types, $id){
+		return $template;
 	}
 
 	protected function hook_for_search_meta(){
@@ -1617,6 +1727,89 @@ jQuery(function($){
 		}
 
 		return $apply_taxonomies;
+	}
+
+/*** term_routes ***/
+
+	protected function set_use_term_route_key_if_exist($cmpnt_key, $cmpnts){
+		$tax_query = $this->get_str_if_isset($cmpnts, 'tax_query');
+		if( !$tax_query ) return;
+
+		$use_term_route_key = (bool)$this->get_if_isset($cmpnts, 'use_term_route');
+		if( $use_term_route_key ) $this->allow_term_route_keys[] = $cmpnt_key;
+	}
+
+	protected function set_current_term_routes(){
+		$term_route_keys = $this->allow_term_route_keys;
+		if( !$this->is_valid_arr($term_route_keys) ) return;
+
+		foreach( $term_route_keys as $cmpnt_key ){
+			$req_val = $this->get_the_search_requested_val($cmpnt_key);
+			$req_val = $this->complement_tax_val_if_is_term_archive($req_val, $cmpnt_key);
+			$tax_slug = $this->get_the_tax_slug_by_component_key($cmpnt_key);
+			if( NULL === $req_val || !$tax_slug ) continue;
+
+			$id_key = "{$cmpnt_key}/values/{$req_val}/0/val";
+			$term_id = (int)$this->get_the_search_components($id_key);
+			$term_obj = get_term($term_id, $tax_slug);
+
+			$term_routes = array();
+			if( $this->is_wp_term($term_obj) ){
+				$term_ancestors = get_ancestors( $term_id, $tax_slug );
+				$term_routes = ( $term_ancestors ) ? array_reverse($term_ancestors) : array();
+				$term_routes[] = $term_id;
+			}
+
+			$this->current_term_routes[$tax_slug] = $term_routes;
+		}
+	}
+
+	protected function get_the_current_term_route($tax_slug){
+		return $this->get_arr_if_isset($this->current_term_routes, $tax_slug);
+	}
+
+	protected function get_the_current_term_route_by_component_key($cmpnt_key){
+		$tax_slug = $this->get_the_tax_slug_by_component_key($cmpnt_key);
+		$term_route = $this->get_the_current_term_route($tax_slug);
+		return $term_route;
+	}
+
+	protected function filter_request_val_at_archive_input_for_term_route($req_val, $cmpnt_key){
+		if( !in_array( $cmpnt_key, $this->allow_term_route_keys, true ) ) return $req_val;
+
+		$term_route = $this->get_the_current_term_route_by_component_key($cmpnt_key);
+		if( $term_route ){
+			$req_val = $term_route;
+		}
+		return $req_val;
+	}
+
+	protected function filter_term_tree_at_level_selects_for_term_route($term_tree, $cmpnt_key){
+		if( !in_array( $cmpnt_key, $this->allow_term_route_keys, true ) ) return $term_tree;
+
+		$term_route = $this->get_the_current_term_route_by_component_key($cmpnt_key);
+		$term_tree = $this->recursive_reduce_term_tree($term_tree, $term_route);
+
+		return $term_tree;
+	}
+
+	protected function recursive_reduce_term_tree($term_tree, $term_route){
+		if( !is_array($term_tree) ) return $term_tree;
+
+		$parent_id = ( $term_route ) ? array_shift($term_route) : 0;
+		foreach( $term_tree as $term_id => $branches ){
+			if( !is_array($branches) ) continue;
+
+			$branches = ( $parent_id && $parent_id === $term_id ) ? $branches : array();
+
+			if( 0 < count($branches) ){
+				$branches = $this->recursive_reduce_term_tree($branches, $term_route);
+			}
+
+			$term_tree[$term_id] = $branches;
+		}
+
+		return $term_tree;
 	}
 
 }
