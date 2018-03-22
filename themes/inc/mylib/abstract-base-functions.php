@@ -1,5 +1,5 @@
 <?php 
-abstract class myBaseFunctions {
+abstract class MyBaseFunctions {
 /*************** Conditional ***************/
 	protected function is_closure($obj){
 		return (bool)( is_object($obj) && $obj instanceof Closure );

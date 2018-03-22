@@ -1,5 +1,5 @@
 <?php 
-abstract class myUscesItemCtrlAbstract {
+abstract class MyUscesItemCtrlAbstract {
 	protected $item_taxonomies = array();
 	protected $item_archive_template_name = "";
 	protected $replace_term_slugs = array(

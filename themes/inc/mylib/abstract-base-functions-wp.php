@@ -1,8 +1,8 @@
 <?php 
 require_once( dirname(__FILE__) . '/abstract-base-functions.php' );
-if( !class_exists('myBaseFunctions') ) return;
+if( !class_exists('MyBaseFunctions') ) return;
 
-abstract class myBaseFunctionsWP extends myBaseFunctions {
+abstract class MyBaseFunctionsWP extends MyBaseFunctions {
 /*************** WP Conditional ***************/
 	protected function is_wp_term($obj){
 		return ( is_object($obj) && $obj instanceof WP_Term ) ? true : false;

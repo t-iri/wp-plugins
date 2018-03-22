@@ -1,8 +1,8 @@
 <?php 
 require_once( dirname(__FILE__) . '/abstract-base-functions-wp.php' );
-if( !class_exists('myBaseFunctionsWP') ) return;
+if( !class_exists('MyBaseFunctionsWP') ) return;
 
-abstract class myArchiveModel extends myBaseFunctionsWP {
+abstract class MyArchiveModel extends MyBaseFunctionsWP {
 	protected $search_post_types = array('post');
 	protected $fixed_post_type = '';
 	protected $per_request_key = '';
