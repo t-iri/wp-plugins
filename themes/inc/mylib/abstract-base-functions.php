@@ -1,8 +1,10 @@
 <?php 
-abstract class MyBaseFunctions {
+namespace Mylib\Base;
+
+abstract class Functions {
 /*************** Conditional ***************/
 	protected function is_closure($obj){
-		return (bool)( is_object($obj) && $obj instanceof Closure );
+		return (bool)( is_object($obj) && $obj instanceof \Closure );
 	}
 
 	protected function is_in_or_eq_value($needle, $haystack){

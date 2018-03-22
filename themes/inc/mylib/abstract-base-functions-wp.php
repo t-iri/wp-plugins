@@ -1,24 +1,35 @@
 <?php 
-require_once( dirname(__FILE__) . '/abstract-base-functions.php' );
-if( !class_exists('MyBaseFunctions') ) return;
+namespace Mylib\Base;
 
-abstract class MyBaseFunctionsWP extends MyBaseFunctions {
+require_once( dirname(__FILE__) . '/abstract-base-functions.php' );
+if( !class_exists('\Mylib\Base\Functions') ) return;
+
+abstract class FunctionsWP extends Functions {
 /*************** WP Conditional ***************/
 	protected function is_wp_term($obj){
-		return ( is_object($obj) && $obj instanceof WP_Term ) ? true : false;
+		return ( is_object($obj) && $obj instanceof \WP_Term ) ? true : false;
 	}
 
 	protected function is_wp_query($obj){
-		return ( is_object($obj) && $obj instanceof WP_Query ) ? true : false;
+		return ( is_object($obj) && $obj instanceof \WP_Query ) ? true : false;
 	}
 
 	protected function is_wp_post($obj){
-		return ( is_object($obj) && $obj instanceof WP_Post ) ? true : false;
+		return ( is_object($obj) && $obj instanceof \WP_Post ) ? true : false;
 	}
 
 	protected function is_catchable_wp_global_post(){
 		global $post;
 		return $this->is_wp_post($post);
+	}
+
+	protected function is_any_term_archive($q=NULL){
+		$is_any_term_archive = (
+			$this->is_the_tax_archive('category', $q) 
+			|| $this->is_the_tax_archive('post_tag', $q) 
+			|| $this->is_the_tax_archive('', $q) 
+		) ? true : false;
+		return $is_any_term_archive;
 	}
 
 	protected function is_the_tax_archive($tax, $q=NULL){
@@ -37,6 +48,19 @@ abstract class MyBaseFunctionsWP extends MyBaseFunctions {
 			$is_term = ( $tax !== 'category' ) ? ( ( $tax !== 'post_tag' ) ? is_tax($tax, $term) : is_tag($term) ) : is_category($term);
 		}
 		return (bool)$is_term;
+	}
+
+	protected function term_is_self_or_ancestor_of($base_term, $check_term, $taxonomy){
+		$base_term = get_term($base_term, $taxonomy);
+		$check_term = get_term($check_term, $taxonomy);
+		if( !$this->is_wp_term($base_term) || !$this->is_wp_term($check_term) ) return false;
+
+		$bool = ( 
+			( $base_term->term_id === $check_term->term_id ) 
+			|| ( term_is_ancestor_of($base_term, $check_term, $taxonomy) ) 
+		) ? true : false;
+
+		return $bool;
 	}
 
 /*************** WP Objects ***************/
