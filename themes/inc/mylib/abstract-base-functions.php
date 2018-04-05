@@ -59,7 +59,7 @@ abstract class Functions {
 	protected function make_attr($attr, $str=''){
 		if( is_string($attr) ){
 			if( is_array($str) ) $str = implode( ' ', array_filter($str) );
-			return sprintf(' %s="%s"', $attr, $str);
+			return sprintf( ' %s="%s"', $attr, htmlspecialchars($str, ENT_QUOTES) );
 		}
 		$single_str = '';
 		if( is_array($attr) ){
@@ -71,47 +71,52 @@ abstract class Functions {
 	}
 
 	protected function make_prop($str){
-		if( is_string($str) ){
-			return sprintf(' %1$s="%1$s"', $str);
-		}
-		$single_str = '';
-		if( is_array($str) ){
-			foreach( $str as $v ){
-				$single_str .= $this->make_prop($v);
-			}
-		}
-		return $single_str;
+		$arr = is_array($str) ? $str : array($str);
+		return $this->make_attr( array_combine($arr, $arr) );
 	}
 
 	protected function make_a_tag($href, $attr, $str){
-		return sprintf('<a href="%s"%s>%s</a>', $href, $attr, $str);
+		if( is_array($attr) ) $attr = $this->make_attr($attr);
+		$attr = $this->make_attr( array(
+			'href' => $href, 
+		) ) . $attr;
+		return $this->make_html_tag('a', $attr, $str);
 	}
 
-	protected function make_img_tag($src, $alt, $attr){
-		return sprintf('<img src="%s" alt="%s"%s>', $src, $alt, $attr);
+	protected function make_img_tag($src, $alt='', $attr=''){
+		if( is_array($src) ){
+			$attr = $this->make_attr($src);
+		} else {
+			$attr = $this->make_attr( array(
+				'src' => $src, 
+				'alt' => $alt, 
+			) ) . $attr;
+		}
+		return sprintf('<img%s>', $attr);
 	}
 
 	protected function make_ipt_tag($type, $value='', $attr=''){
 		if( is_array($type) ){
-			foreach( $type as $k => $v ){
-				$type[$k] = $this->make_attr($k, $v);
-			}
-			$type = implode($type, " ");
-			return sprintf('<input%s>', $type);
+			$attr = $this->make_attr($type);
+		} else {
+			$attr = $this->make_attr( array(
+				'type' => $type, 
+				'value' => $value, 
+			) ) . $attr;
 		}
-		return sprintf('<input type="%s" value="%s"%s>', $type, $value, $attr);
+		return sprintf('<input%s>', $attr);
 	}
 
 	protected function make_html_tag($tag, $attr, $str){
+		if( is_array($attr) ) $attr = $this->make_attr($attr);
 		return sprintf('<%1$s%2$s>%3$s</%1$s>', $tag, $attr, $str);
 	}
 
 /*************** validate convert ***************/
 	protected function convert_eol($val, $to="\n"){
 		$eol = array("\r\n", "\r", "\n");
-		if( '' === $to ){
-			return is_string($val) ? str_replace($eol, '', $val) : '';
-		}
+		if( '' === $to ) return is_string($val) ? str_replace($eol, '', $val) : '';
+
 		$eol = in_array($to, $eol, true) ? array_fill_keys($eol, $to) : array();
 		return ( is_string($val) && $eol ) ? strtr($val, $eol) : '';
 	}
@@ -148,8 +153,8 @@ abstract class Functions {
 		return $this->validate($val, 'int', true);
 	}
 
-	private function validate($val, $type="", $change_bool=false){
-		switch($type){
+	private function validate($val, $type='', $change_bool=false){
+		switch( $type ){
 			case 'str':
 			case 'string':
 				$val = ( 
@@ -230,10 +235,13 @@ abstract class Functions {
 	}
 
 	protected function search_arr_val_deeply($arr, $key){
-		$keys = ( !is_string($key) ) 
-		? ( is_array($key) ? $key : array($key) ) 
-		:  explode('/', $key);
-		if( !is_array($keys) || !$keys ) return false;
+		$keys = array();
+		if( is_string($key) ){
+			$keys = explode('/', $key);
+		} else {
+			$keys = is_array($key) ? $key : array($key);
+		}
+		if( !$keys ) return false;
 
 		foreach( $keys as $k ){
 			$arr = ( is_array($arr) && isset($arr[$k]) ) ? $arr[$k] : NULL;

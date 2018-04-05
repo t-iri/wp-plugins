@@ -84,21 +84,16 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 	protected function get_the_arr_val($any, $str_key=''){
 		$str_key = (string)$str_key;
-		if( '' !== $str_key ) $any = $this->search_arr_val_deeply( $any, $str_key );
-		return $any;
+		return ( '' === $str_key ) ? $any : $this->search_arr_val_deeply($any, $str_key);
 	}
 
 /*************/
 
 	protected function make_appropriate_request_key($cmpnt_key){
 		$prime_key = $this->get_key_parsed_component_key($cmpnt_key);
-		$sub_key = (string)$this->get_key_parsed_component_key($cmpnt_key, 'sub');
-
 		$req_key = $prime_key;
-		if( '' !== $sub_key ){
-			$req_key .= '['.$sub_key.']';
-		}
-
+		$sub_key = (string)$this->get_key_parsed_component_key($cmpnt_key, 'sub');
+		if( '' !== $sub_key ) $req_key .= '['.$sub_key.']';
 		return $req_key;
 	}
 
@@ -106,13 +101,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$keys = explode(':', $cmpnt_key, 2);
 		$prime_key = $keys[0];
 		if( in_array( $type, array('prime'), true ) ) return $prime_key;
-
-		$sub_key = '';
-		if( 'sub' === $type && isset($keys[1]) ){
-			$sub_key = $keys[1];
-		}
-
-		return $sub_key;
+		return ( 'sub' === $type && isset($keys[1]) ) ? $keys[1] : '';
 	}
 
 /*************/
@@ -121,13 +110,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$tax_queries = explode('/', $tax_query, 2);
 		$tax_slug = $tax_queries[0];
 		if( in_array( $type, array('tax', 'taxonomy'), true ) ) return $tax_slug;
-
-		$term_slug = '';
-		if( 'term' === $type && isset($tax_queries[1]) ){
-			$term_slug = $tax_queries[1];
-		}
-
-		return $term_slug;
+		return ( 'term' === $type && isset($tax_queries[1]) ) ? $tax_queries[1] : '';
 	}
 
 /****** query *******/
@@ -136,10 +119,10 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$this->ignoring_force_search_arg = (bool)$bool;
 	}
 
-	protected function is_having_force_search_arg($query){
-		if( !$this->is_wp_query($query) ) return false;
+	protected function is_having_force_search_arg($qry){
+		if( !$this->is_wp_query($qry) ) return false;
 
-		return (bool)$query->get($this->force_search_arg_key, false);
+		return (bool)$qry->get($this->force_search_arg_key, false);
 	}
 
 	protected function is_main_query_having_force_search_arg(){
@@ -180,20 +163,16 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 	protected function get_the_search_requested_complementing_val($cmpnt_key){
 		$req_val = $this->get_the_search_requested_val($cmpnt_key);
-		$req_val = $this->complement_search_requested_val($req_val, $cmpnt_key);
-		return $req_val;
+		return $this->complement_search_requested_val($req_val, $cmpnt_key);
 	}
 
 	protected function get_the_tax_query_by_component_key($cmpnt_key){
-		$tax_key = "{$cmpnt_key}/tax_query";
-		$tax_query = (string)$this->get_the_search_components($tax_key);
-		return $tax_query;
+		return (string)$this->get_the_search_components("{$cmpnt_key}/tax_query");
 	}
 
 	protected function get_the_tax_slug_by_component_key($cmpnt_key){
 		$tax_query = $this->get_the_tax_query_by_component_key($cmpnt_key);
-		$tax_slug = $this->get_slug_parsed_tax_query($tax_query);
-		return $tax_slug;
+		return $this->get_slug_parsed_tax_query($tax_query);
 	}
 
 	protected function complement_search_requested_val($req_val, $cmpnt_key){
@@ -220,11 +199,10 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 				$req_val = $tax_val;
 			}
 		}
-
 		return $req_val;
 	}
 
-	protected function get_the_tax_component_by_query($query=NULL){
+	protected function get_the_tax_component_by_query($qry=NULL){
 		$tax_component = array();
 		$srch_components = $this->get_the_search_components();
 		if( !$srch_components ) return $tax_component;
@@ -244,7 +222,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 					$term = get_term($trm_id, $txnmy);
 					if( 
 						( !$this->is_wp_term($term) ) 
-						|| ( !$this->is_the_term_archive($txnmy, $trm_id, $query) ) 
+						|| ( !$this->is_the_term_archive($txnmy, $trm_id, $qry) ) 
 					) continue;
 
 					$tax_component['key'] = $cmpnt_key;
@@ -256,7 +234,30 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		return $tax_component;
 	}
 
+	protected function get_tax_terms_by_tax_query($tax_query, $cmpnt_key){
+		$txnmy = $this->get_slug_parsed_tax_query($tax_query);
+		$term_slug = $this->get_slug_parsed_tax_query($tax_query, 'term');
+
+		$srch_components = $this->get_the_search_components($cmpnt_key);
+		$tax_args = $this->get_arr_if_isset($srch_components, 'tax_args');
+
+		$args = $this->recursive_parse_args( array(
+			'hide_empty' => false, 
+		), $tax_args );
+		$args['taxonomy'] = $txnmy;
+
+		$trm_id = $this->get_wp_term_by_slug($txnmy, $term_slug, 'term_id');
+		if( $trm_id ) $args['parent'] = $trm_id;
+		return get_terms($args);
+	}
+
 /****** sort+search *******/
+
+	private function get_the_requesting_value($cmpnt_key){
+		$search_key = str_replace(':', '/', $cmpnt_key);
+		$v = $this->search_arr_val_deeply($_GET, $search_key);
+		return ( NULL === $v ) ? $v : stripslashes_deep($v);
+	}
 
 	protected function get_requested_values($cmpnt_type){
 		$req_vals = array();
@@ -339,20 +340,19 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 /*************/
 
-	public function hook_parse_query_for_sort_and_search($query){
+	public function hook_parse_query_for_sort_and_search($qry){
 		if( $this->ignoring_force_search_arg ) return;
 
 		$keys = $this->get_request_component_keys('all');
 		$req_values = array();
-		foreach($keys as $key){
-			$search_key = str_replace(':', '/', $key);
-			$g_val = $this->search_arr_val_deeply($_GET, $search_key);
+		foreach( $keys as $key ){
+			$g_val = $this->get_the_requesting_value($key);
 			if( NULL === $g_val ) continue;
 
 			$can_set = array_filter( array(
-				( $query->is_archive() || $query->is_search() ), 
-				( $query->get($key) ), 
-				( $this->is_having_force_search_arg($query) ), 
+				( $qry->is_archive() || $qry->is_search() ), 
+				( $qry->get($key) ), 
+				( $this->is_having_force_search_arg($qry) ), 
 			) ) ? true : false;
 
 			if( !$can_set ) continue;
@@ -363,41 +363,41 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 		$this->requested_values = $req_values;
 
-		$query->set($this->force_search_arg_key, true);
+		$qry->set($this->force_search_arg_key, true);
 		foreach( $this->requested_values as $key => $val ){
-			$query->set($key, $val);
+			$qry->set($key, $val);
 		}
 	}
 
 /*************/
 
-	public function hook_pre_get_posts_for_sort_and_search($query){
+	public function hook_pre_get_posts_for_sort_and_search($qry){
 		if( is_admin() ) return;
-		if( !$query->is_main_query() && !$this->hook_pgp_also_sub_queries ) return;
-		if( !$query->is_main_query() && !$this->is_having_force_search_arg($query) ) return;
+		if( !$qry->is_main_query() && !$this->hook_pgp_also_sub_queries ) return;
+		if( !$qry->is_main_query() && !$this->is_having_force_search_arg($qry) ) return;
 		if( $this->ignoring_force_search_arg ) return;
 
-		$this->set_archive_sort_query($query);
-		$this->set_archive_search_query($query);
-		$this->own_action_after_set_archive_query($query);
+		$this->set_archive_sort_query($qry);
+		$this->set_archive_search_query($qry);
+		$this->own_action_after_set_archive_query($qry);
 
 		$this->set_current_term_routes();
 	}
 
-	protected function own_action_after_set_archive_query($query){
+	protected function own_action_after_set_archive_query($qry){
 		//as need arises
 		return;
 	}
 
 /*************/
 
-	protected function set_archive_sort_query($query){
-		$set_val = $this->get_appropriate_sort_query_val($query, $this->per_request_key);
+	protected function set_archive_sort_query($qry){
+		$set_val = $this->get_appropriate_sort_query_val($qry, $this->per_request_key);
 		if( NULL !== $set_val ){
-			$query->set( 'posts_per_page', $set_val );
+			$qry->set( 'posts_per_page', $set_val );
 		}
 
-		$set_val = $this->get_appropriate_sort_query_val($query, $this->ordby_request_key);
+		$set_val = $this->get_appropriate_sort_query_val($qry, $this->ordby_request_key);
 		if( $this->is_valid_arr($set_val) ){
 			$ordby = $this->get_str_if_isset($set_val, 'orderby');
 			$order = $this->get_str_if_isset($set_val, 'order');
@@ -407,37 +407,36 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 				$meta_type = $this->get_str_if_isset($set_val, 'meta_type');
 				$meta_type = ( $meta_type ) ? $meta_type : 'NUMERIC';
-				$this->set_query_meta_orderby($query, $ordby[1], $order, $meta_type);
+				$this->set_query_meta_orderby($qry, $ordby[1], $order, $meta_type);
 
 			} else {
 
-				$query->set('orderby', $ordby[0]);
-				$query->set('order', $order);
+				$qry->set('orderby', $ordby[0]);
+				$qry->set('order', $order);
 
 			}
 		}
 	}
 
-	protected function get_appropriate_sort_query_val($query, $key){
-		if( !$this->is_wp_query($query) ) return false;
+	protected function get_appropriate_sort_query_val($qry, $key){
+		if( !$this->is_wp_query($qry) ) return false;
 
 		$cmpnts = $this->get_the_sort_components($key);
 		if( !is_array($cmpnts) || !isset($cmpnts[0]) ) return NULL;
 
-		$q_val = (int)$query->get($key, 0);
-		$v = isset($cmpnts[$q_val]) ? $cmpnts[$q_val] : $cmpnts[0];
-		return $v;
+		$q_val = (int)$qry->get($key, 0);
+		return isset($cmpnts[$q_val]) ? $cmpnts[$q_val] : $cmpnts[0];
 	}
 
-	protected function set_query_meta_orderby($query, $ordby, $order, $meta_type){
-		if( !$this->is_wp_query($query) ) return false;
+	protected function set_query_meta_orderby($qry, $ordby, $order, $meta_type){
+		if( !$this->is_wp_query($qry) ) return false;
 
 		$meta_key = $ordby;
 
-		$query->set('meta_key', $meta_key);
-		$query->set('meta_type', $meta_type);
-		$query->set('orderby', 'meta_value');
-		$query->set('order', $order);
+		$qry->set('meta_key', $meta_key);
+		$qry->set('meta_type', $meta_type);
+		$qry->set('orderby', 'meta_value');
+		$qry->set('order', $order);
 	}
 
 /*******************************************************/
@@ -501,6 +500,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 			'component_type' => 'sort', 
 		);
 		$args = $this->recursive_parse_args($defaults, $args, false);
+		if( 'text' === $itype ) $args['input_type'] = $itype; //not allow overwrite
 
 		$ipt_cls = $this->get_if_isset($args, 'class');
 		$ipt_cls = is_array($ipt_cls) ? $ipt_cls : array_filter( explode(' ', $ipt_cls) );
@@ -516,7 +516,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 		$iname = $this->make_appropriate_request_key($cmpnt_key);
 		$args['_input_name'] = $iname;
-		switch($itype){
+		switch( $itype ){
 			case 'select':
 				$val_type = $this->get_str_if_isset($args, 'value_type');
 
@@ -587,7 +587,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 						if( in_array('schange-switch', $group_cls, true) ){
 							$script_keys[] = 'change';
 						}
-						$attr .= $this->make_cls_attr( implode(' ', $group_cls) );
+						$attr .= $this->make_cls_attr($group_cls);
 					}
 
 					$ieach = $this->make_html_tag( 'select', $attr, implode("\n", $opts) );
@@ -595,43 +595,47 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 					if( $ipt_id ) $label_arr['attr_arr']['for'] = $ipt_id;
 					$ipt .= $this->arrange_input_label_place($ieach, $label_arr);
 				}
-
 				$this->activate_select_script($script_keys);
-
 				break;
 
 			case 'checkbox':
 			case 'radio':
+			case 'text':
 				foreach( $cmpnt_vals as $idx => $v_arr ){
 					$attr = '';
 					$ipt_val = (string)$idx;
-					if( $this->is_in_or_eq_value($ipt_val, $req_val) ){
+					if( 'text' === $itype ){
+						$ipt_val = $req_val;
+					} elseif( $this->is_in_or_eq_value($ipt_val, $req_val) ) {
 						$attr .= $this->make_prop('checked');
 					}
 
 					$ipername = $iname;
-					$ipername .= $this->is_multi_arg_input_type($itype) ? '[]' : '';
+					if( $this->is_multi_arg_input_type($itype) ) $ipername .= '[]';
 					$attr .= $this->make_attr('name', $ipername);
 
 					$ipt_id = $this->make_archive_input_id($iname, $idx, $args);
 					if( $ipt_id ) $attr .= $this->make_attr('id', $ipt_id);
+					if( $ipt_cls ) $attr .= $this->make_cls_attr($ipt_cls);
 
 					$ieach = $this->make_ipt_tag($itype, $ipt_val, $attr);
 
 					$label_arr['attr_arr']['for'] = $ipt_id;
-					$label_arr['text'] = $this->make_values_display($v_arr, $args);
+					if( 'text' !== $itype ){
+						$label_arr['text'] = $this->make_values_display($v_arr, $args);
+					}
 					$ipt .= $this->arrange_input_label_place($ieach, $label_arr);
 				}
 				break;
 
 			case 'a_list':
 			case 'a_stair_list':
-				$ipt .= $this->make_a_list_html($cmpnt_key, $cmpnt_vals, $args, $req_val);
+				$ipt = $this->make_a_list_html($cmpnt_key, $cmpnt_vals, $args, $req_val);
 				break;
 
 			case 'term_level_select':
 				$selects = $this->loop_make_level_selects($cmpnt_key, $cmpnt_vals, $args);
-				$ipt .= implode("\n", $selects);
+				$ipt = implode("\n", $selects);
 				break;
 		}
 		return $this->own_filter_archive_input_html($ipt, $cmpnt_key, $cmpnt_vals, $args, $itype);
@@ -781,9 +785,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 				$a_tag .= $this->loop_a_list_html($chldrn, $loop_args, $req_val);
 			}
 			$a_list[] = $this->make_html_tag('li', $attr, $a_tag);
-
 		}
-
 		$ul_cls = implode( ' ', array_filter($cls_arr['ul']) );
 		$attr = ( $ul_cls ) ? $this->make_cls_attr($ul_cls) : '';
 		return $this->make_html_tag( 'ul', $attr, implode("\n", $a_list) );
@@ -907,14 +909,14 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		add_filter('term_link', array($this, 'hook_search_components_term_link'), 20, 3);
 	}
 
-	protected function set_archive_search_query($query){
-		if( $query->is_main_query() ){
-			if( $query->is_search() ){
-				$query->set('post_type', $this->search_post_types); /* avoid post_type 'any' */
+	protected function set_archive_search_query($qry){
+		if( $qry->is_main_query() ){
+			if( $qry->is_search() ){
+				$qry->set('post_type', $this->search_post_types); /* avoid post_type 'any' */
 			}
 
-			if( $this->use_display_count && $this->is_search_page($query) ){
-				$this->set_count_per_search_display($query);
+			if( $this->use_display_count && $this->is_search_page($qry) ){
+				$this->set_count_per_search_display($qry);
 			}
 		}
 
@@ -926,13 +928,13 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		/* components' relation AND */
 		$post_in = false;
 		$is_zero_posts = false; //to store searched_words
-		$tax_component = $this->get_the_tax_component_by_query($query);
+		$tax_component = $this->get_the_tax_component_by_query($qry);
 		$tax_key = $this->get_str_if_isset($tax_component, 'key');
 		if( $tax_key && isset($tax_component['idx']) ){
 			$tax_idx = (string)$tax_component['idx'];
 		}
 		foreach( $srch_components as $cmpnt_key => $cmpnts ){
-			$queried_val = $query->get($cmpnt_key, NULL);
+			$queried_val = $qry->get($cmpnt_key, NULL);
 			if( NULL === $queried_val || '' === $queried_val ) continue;
 
 			$cancel_check_key = $this->get_str_if_isset($cmpnts, 'dont_search_after');
@@ -943,9 +945,9 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 				}
 			}
 
-			$ex_keys = $this->get_arr_if_isset($cmpnts, 'meta_keys');
+			$keys = $this->get_arr_if_isset($cmpnts, 'meta_keys');
 			$q_type = 'meta';
-			if( !$ex_keys ){
+			if( !$keys ){
 				$tax_query = $this->get_str_if_isset($cmpnts, 'tax_query');
 				if( $tax_query ){
 					$q_type = 'tax';
@@ -953,19 +955,20 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 				} else {
 					$key_components = explode(':', $cmpnt_key, 2);
 				}
-				$ex_keys = array($key_components[0]);
+				$keys = array($key_components[0]);
 			}
 
-			$cmpnt_values = $this->get_arr_if_isset($cmpnts, 'values');
+			$itype = $this->get_str_if_isset($cmpnts, 'itype');
+			if( 'text' === $itype ) $queried_val = 0; //convert string into value index
 
-			$loop_vals = is_array($queried_val) ? $queried_val : array($queried_val);
 			$per_val_ids = array();
+			$cmpnt_values = $this->get_arr_if_isset($cmpnts, 'values');
+			$loop_vals = is_array($queried_val) ? $queried_val : array($queried_val);
 			foreach( $loop_vals as $q_val ){
 				$values = $this->get_arr_if_isset($cmpnt_values, $q_val);
 
 				if( !$is_zero_posts ){
-
-					$per_ids = $this->get_post_ids_for_search_query($ex_keys, $values, $cmpnts, $query, $q_type);
+					$per_ids = $this->get_post_ids_for_search_query($keys, $values, $cmpnts, $qry, $q_type);
 					if( false === $per_ids ) continue;
 
 					$per_val_ids[$q_val] = $per_ids;
@@ -992,7 +995,6 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		/* behave as AND */
 			$post_in = ( !$post_in ) ? $per_val_ids : array_intersect( $post_in, $per_val_ids );
 			if( empty( $post_in ) ) $is_zero_posts = true;
-
 		}
 
 		$this->clear_current_searching_type();
@@ -1000,10 +1002,10 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		if( !is_array($post_in) ) return;
 
 		$post_in = ( $post_in ) ? $post_in : array(0);
-		$query->set('post__in', $post_in);
+		$qry->set('post__in', $post_in);
 	}
 
-	protected function set_count_per_search_display($query){
+	protected function set_count_per_search_display($qry){
 		$srch_components = $this->get_the_search_components();
 		if( !$this->is_valid_arr($srch_components) ) return;
 
@@ -1025,10 +1027,9 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 			foreach( $cmpnt_values as $idx => $values ){
 				if( isset($values['count']) ) continue;
 
-				$per_ids = $this->get_post_ids_for_search_query($meta_keys, $values, $cmpnts, $query);
+				$per_ids = $this->get_post_ids_for_search_query($meta_keys, $values, $cmpnts, $qry);
 				$cmpnt_values[$idx]['count'] = ( $per_ids ) ? count($per_ids) : 0;
 			}
-
 			$srch_components[$cmpnt_key]['values'] = $cmpnt_values;
 		}
 
@@ -1037,8 +1038,8 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$this->search_components = $srch_components;
 	}
 
-	protected function get_post_ids_for_search_query($ex_keys, $values, $cmpnts, $query, $q_type=''){
-		if( !$this->is_valid_arr($ex_keys) || !$this->is_valid_arr($values) ) return false;
+	protected function get_post_ids_for_search_query($keys, $values, $cmpnts, $qry, $q_type=''){
+		if( !$this->is_valid_arr($keys) || !$this->is_valid_arr($values) ) return false;
 
 		$allowed_types = array('meta', 'tax');
 		$q_type = in_array($q_type, $allowed_types, true) ? $q_type : $allowed_types[0];
@@ -1047,26 +1048,26 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$d_type = $this->get_str_if_isset($cmpnts, 'dtype');
 		$d_type = ( 'meta' === $q_type  ) ? $this->get_sql_data_type($d_type) : $d_type;
 		$base_args = array(
-			'post_type' => $query->get('post_type'), 
+			'post_type' => $qry->get('post_type'), 
 			'posts_per_page' => -1, 
 		);
-		/* ex_keys' relation OR */
+		/* keys' relation OR */
 		/* values' relation AND */
 		$post_ids = false;
-		foreach( $ex_keys as $ek ){
-			$ex_query = $this->make_ex_query($values, $ek, $q_type, $d_type);
-			if( !$ex_query ) continue;
+		foreach( $keys as $k ){
+			$srch_queries = $this->make_search_queries($values, $k, $q_type, $d_type);
+			if( !$srch_queries ) continue;
 
-			$idx_key = $ek;
+			$idx_key = $k;
 			if( false === $post_ids ){
 				$post_ids[$idx_key] = array();
 			}
 
-			if( 1 < count($ex_query) ){
-				$ex_query['relation'] = 'AND';
+			if( 1 < count($srch_queries) ){
+				$srch_queries['relation'] = 'AND';
 			}
 			$args = $base_args;
-			$args[$q_key] = $ex_query;
+			$args[$q_key] = $srch_queries;
 
 			$this->set_ignoring_force_search_arg(true);
 			$posts = get_posts($args);
@@ -1078,7 +1079,6 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 				$post_ids[$idx_key][] = (int)$post->ID;
 			}
 		}
-
 		if( false !== $post_ids ){
 			$vals_relation = $this->get_str_if_isset($cmpnts, 'values_relation');
 			if( 'AND' === $vals_relation ){
@@ -1087,21 +1087,20 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 				$post_ids = $this->sort_arr_bahaving_as_OR_relation($post_ids);
 			}
 		}
-
 		return $post_ids;
 	}
 
-	private function make_ex_query($values, $ex_key, $q_type, $d_type){
-		$ex_query = array();
+	private function make_search_queries($values, $key, $q_type, $d_type){
+		$srch_queries = array();
 		foreach( $values as $idx => $vls ){
 			if( !is_numeric($idx) ) continue;
 
-			$key_in_values = $this->get_str_if_isset($vls, 'key');
+			$k_in_values = $this->get_str_if_isset($vls, 'key');
 			$q = array();
 			switch( $q_type ){
 				case 'meta':
 					$q = array(
-						'key' => ( $key_in_values ) ? $key_in_values : $ex_key, 
+						'key' => ( $k_in_values ) ? $k_in_values : $key, 
 						'value' => $vls['val'], 
 						'compare' => $vls['compare'], 
 						'type' => ( $d_type ) ? $d_type : 'CHAR', 
@@ -1110,7 +1109,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 				case 'tax':
 					$q = array(
-						'taxonomy' => ( $key_in_values ) ? $key_in_values : $ex_key, 
+						'taxonomy' => ( $k_in_values ) ? $k_in_values : $key, 
 						'field' => ( $d_type ) ? $d_type : 'term_id', 
 						'terms' => $vls['val'], 
 						'include_children' => isset($vls['include_children']) ? (bool)$vls['include_children'] : false, 
@@ -1118,11 +1117,9 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 					);
 					break;
 			}
-			if( !$q ) continue;
-
-			$ex_query[] = $q;
+			if( $q ) $srch_queries[] = $q;
 		}
-		return $ex_query;
+		return $srch_queries;
 	}
 
 	protected function set_search_components(){
@@ -1148,18 +1145,28 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 			}
 
 			$values = $this->get_arr_if_isset($cmpnts, 'values');
+
 			$fxd_vals = $this->get_arr_if_isset($fixed_values, $prime_key);
+
+			$itype = $this->get_str_if_isset($cmpnts, 'itype');
 
 			$tax_query = $this->get_str_if_isset($cmpnts, 'tax_query');
 			$meta_keys = $this->get_arr_if_isset($cmpnts, 'meta_keys');
-
 			switch( true ){
+				case ( 'text' === $itype ):
+					$values = $this->get_search_input_text_values($cmpnt_key);
+					break;
+
 				case ( $fxd_vals ):
 					$values = $this->get_search_fixed_values($values, $cmpnt_key, $fxd_vals);
 					break;
 
 				case ( $tax_query ):
 					$values = $this->get_search_tax_terms_values($values, $cmpnt_key, $tax_query);
+					break;
+
+				case ( $meta_keys ):
+					$values = $this->get_search_post_meta_values($values, $cmpnt_key, $meta_keys);
 					break;
 
 				default:
@@ -1171,23 +1178,48 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 
 			$this->set_use_term_route_key_if_exist($cmpnt_key, $cmpnts);
 		}
-
 		if( $prioritize_keys ){
 			$srch_components = $this->prioritize_arr_order($srch_components, $prioritize_keys);
 		}
-
 		$this->search_components = $srch_components;
 	}
 
-	protected function get_search_fixed_values($values, $cmpnt_key, $fxd_vals){
-		$prime_key = $this->get_key_parsed_component_key($cmpnt_key);
+/*************/
+
+	protected function get_search_input_text_values($cmpnt_key){
 		$sub_key = $this->get_key_parsed_component_key($cmpnt_key, 'sub');
-		foreach( $fxd_vals as $fv ){
+		$cmpr = $this->get_the_compare_value('operator', $sub_key);
+		$req_val = (string)$this->get_the_requesting_value($cmpnt_key);
+		$vals = array($req_val);
+		if( 'eq' !== $sub_key ){
+			$cmpr = 'LIKE';
+			$vals = explode( ' ', mb_convert_kana($req_val, 's') );
+		}
+		$vals = array_unique( array_filter($vals, 'mb_strlen') );
+		if( !$vals ) $vals = array('');
+
+		$values = array(
+			array(
+				'display' => $req_val, 
+			), 
+		);
+		foreach( $vals as $v ){
+			$values[0][] = array(
+				'compare' => $cmpr, 'val' => $v, 
+			);
+		}
+		return $values;
+	}
+
+/*************/
+
+	protected function get_search_fixed_values($values, $cmpnt_key, $fxd_vals){
+		$sub_key = $this->get_key_parsed_component_key($cmpnt_key, 'sub');
+		foreach( $fxd_vals as $v ){
 			$cmpr = $this->get_the_compare_value('operator', $sub_key);
-			$dsply = $this->make_search_fixed_value_display($fv, $cmpnt_key);
 			$values[] = array(
-				'display' => $dsply, 
-				array( 'compare' => $cmpr, 'val' => $fv ), 
+				'display' => $this->make_search_fixed_value_display($v, $cmpnt_key), 
+				array( 'compare' => $cmpr, 'val' => $v ), 
 			);
 		}
 		return $values;
@@ -1203,39 +1235,19 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		return $val;
 	}
 
-	protected function get_tax_terms_by_tax_query($tax_query, $cmpnt_key){
-		$txnmy = $this->get_slug_parsed_tax_query($tax_query);
-		$term_slug = $this->get_slug_parsed_tax_query($tax_query, 'term');
-
-		$srch_components = $this->get_the_search_components($cmpnt_key);
-		$tax_args = $this->get_arr_if_isset($srch_components, 'tax_args');
-
-		$args = array(
-			'hide_empty' => false, 
-		);
-		$args = $this->recursive_parse_args($args, $tax_args);
-		$args['taxonomy'] = $txnmy;
-
-		$trm_id = $this->get_wp_term_by_slug($txnmy, $term_slug, 'term_id');
-		if( $trm_id ){
-			$args['parent'] = $trm_id;
-		}
-		return get_terms($args);
-	}
+/*************/
 
 	protected function get_search_tax_terms_values($values, $cmpnt_key, $tax_query){
 		$terms = $this->get_tax_terms_by_tax_query($tax_query, $cmpnt_key);
 		if( !$terms || is_wp_error($terms) ) return $values;
 
 		foreach( $terms as $term ){
-			$trm_vals = array(
+			$values[$term->term_id] = $this->own_filter_search_tax_terms_values( array(
 				'display' => $term->name, 
 				array( 'compare' => 'IN', 'val' => $term->term_id ), 
 				'count' => $term->count, 
-			);
-			$values[$term->term_id] = $this->own_filter_search_tax_terms_values($trm_vals, $terms, $cmpnt_key);
+			), $terms, $cmpnt_key );
 		}
-
 		return $values;
 	}
 
@@ -1243,6 +1255,15 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		//as need arises
 		return $trm_vals;
 	}
+
+/*************/
+
+	protected function get_search_post_meta_values($values, $cmpnt_key, $meta_keys){
+		//as need arises
+		return $values;
+	}
+
+/*************/
 
 	protected function get_search_dynamic_values($values, $cmpnt_key){
 		//as need arises
@@ -1312,19 +1333,17 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$itype = $this->get_str_if_isset($components, 'itype');
 
 		$ipt = $this->get_archive_input_html($key, $values, $ipt_args, $itype);
-
 		return $ipt;
 	}
 
 /*******************************************************/
 
 	protected function get_reset_input($args=array()){
-		$ipt_args = $this->recursive_parse_args( array(
+		return $this->make_ipt_tag( $this->recursive_parse_args( array(
 			'type' => 'submit', 
 			'name' => $this->archive_search_reset_key, 
 			'value' => 'リセット', 
-		), $args, false );
-		return $this->make_ipt_tag($ipt_args);
+		), $args, false ) );
 	}
 
 	protected function get_hiddens_input(){
@@ -1482,7 +1501,7 @@ jQuery(function($){
 	}
 
 	protected function get_the_compare_value($kind, $key){
-		$values = $this->get_arr_if_isset( array(
+		return $this->get_str_if_isset( $this->get_arr_if_isset( array(
 			'operator' => array(
 				'eq' => '=', 
 				'ge' => '>=', 'gt' => '>', 
@@ -1493,18 +1512,16 @@ jQuery(function($){
 				'ge' => '以上', 'gt' => 'より大きい', 
 				'le' => '以下', 'lt' => '未満', 
 			), 
-		), $kind );
-		return $this->get_str_if_isset($values, $key);
+		), $kind ), $key );
 	}
 
 	protected function get_sql_data_type($type){
-		$type = $this->get_str_if_isset( array(
+		return $this->get_str_if_isset( array(
 			'integer' => 'UNSIGNED', 
 			'string' => 'CHAR', 
 			'float' => 'DECIMAL(10,3)', 
 			'date' => 'DATE', 
 		), $type );
-		return $type;
 	}
 
 	protected function sort_arr_bahaving_as_OR_relation($arr){
@@ -1516,9 +1533,7 @@ jQuery(function($){
 				...
 			);
 		 ***/
-		$arr = array_reduce($arr, 'array_merge', array());
-		$arr = array_unique($arr);
-		return $arr;
+		return array_unique( array_reduce( $arr, 'array_merge', array() ) );
 	}
 
 	protected function sort_arr_bahaving_as_AND_relation($arr){
@@ -1598,11 +1613,12 @@ jQuery(function($){
 		if( $this->is_valid_arr($searched_words) ){
 			foreach( $searched_words as $cmpnt_key => $svars ){
 				$svars = is_array($svars) ? $svars : array( (string)$svars );
-				$searched_words[$cmpnt_key] = implode( ', ', array_filter($svars) );
+				$searched_words[$cmpnt_key] = implode( ', ', array_filter($svars, 'mb_strlen') );
 			}
 		}
 		$searched_words = is_array($searched_words) ? $searched_words : array($searched_words);
-		$search_phrase = implode( ' / ', array_filter($searched_words) );
+		$search_phrase = array_map( 'esc_html', array_filter($searched_words, 'mb_strlen') );
+		$search_phrase = implode(' / ', $search_phrase);
 		$search_phrase .= ( $search_phrase ) ? 'の' : '';
 		if( is_tax() ){
 			$obj = get_queried_object();
@@ -1767,11 +1783,9 @@ jQuery(function($){
 				}
 			}
 		}
-
 		if( $param_val ){
 			$termlink = $this->make_appropriate_search_url($param_key, $param_val);
 		}
-
 		return $termlink;
 	}
 
