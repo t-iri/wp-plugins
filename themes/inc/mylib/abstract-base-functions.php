@@ -112,6 +112,24 @@ abstract class Functions {
 		return sprintf('<%1$s%2$s>%3$s</%1$s>', $tag, $attr, $str);
 	}
 
+	protected function make_ipt_name_value($prime, $sub=array()){
+		if( is_array($prime) ){
+			$sub = $prime;
+			$prime = array_shift($sub);
+		}
+		return $prime . implode( '', array_map( function($v){
+			return '[' . $v .  ']';
+		}, array_filter($sub, 'mb_strlen') ) );
+	}
+
+	protected function convert_ipt_name_value_into_id_value($name_val){
+		return strtr( '__' . (string)$name_val, array(
+			'][' => '-', 
+			'[' => '-', 
+			']' => '', 
+		) );
+	}
+
 /*************** validate convert ***************/
 	protected function convert_eol($val, $to="\n"){
 		$eol = array("\r\n", "\r", "\n");
@@ -207,6 +225,43 @@ abstract class Functions {
 		}
 
 		$val = ( is_array($args) && isset($args[$key]) ) ? $args[$key] : NULL;
+		if( '' === (string)$fmt ) return $val;
+		if( 'string' === $fmt && is_array($val) ) return '';
+
+		settype($val, $fmt);
+		return $val;
+	}
+
+	protected function shift_str_if_isset(&$arr, $key){
+		return $this->shift_if_isset($arr, $key, 'string');
+	}
+
+	protected function shift_arr_if_isset(&$arr, $key){
+		return $this->shift_if_isset($arr, $key, 'array');
+	}
+
+	protected function shift_int_if_isset(&$arr, $key){
+		return $this->shift_if_isset($arr, $key, 'integer');
+	}
+
+	protected function shift_float_if_isset(&$arr, $key){
+		return $this->shift_if_isset($arr, $key, 'float');
+	}
+
+	protected function shift_number_if_isset(&$arr, $key){
+		$val = $this->shift_str_if_isset($arr, $key);
+		return preg_match( "/^(\d+)$/u", mb_convert_kana($val, 'n') ) ? $val : '';
+	}
+
+	protected function shift_if_isset(&$arr, $key, $fmt=''){
+		if( in_array( $fmt, array('number'), true ) ){
+			return $this->shift_number_if_isset($arr, $key);
+		}
+		$val = NULL;
+		if( is_array($arr) && isset($arr[$key]) ){
+			$val = $arr[$key];
+			unset($arr[$key]);
+		}
 		if( '' === (string)$fmt ) return $val;
 		if( 'string' === $fmt && is_array($val) ) return '';
 
