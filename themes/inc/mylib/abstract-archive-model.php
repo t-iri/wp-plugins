@@ -392,28 +392,31 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 /*************/
 
 	protected function set_archive_sort_query($qry){
-		$set_val = $this->get_appropriate_sort_query_val($qry, $this->per_request_key);
-		if( NULL !== $set_val ){
-			$qry->set( 'posts_per_page', $set_val );
+		$q_args = array();
+
+		$q_num = $this->get_appropriate_sort_query_val($qry, $this->per_request_key);
+		if( is_numeric($q_num) ){
+			$q_args['posts_per_page'] = $q_num;
 		}
 
-		$set_val = $this->get_appropriate_sort_query_val($qry, $this->ordby_request_key);
-		if( $this->is_valid_arr($set_val) ){
-			$ordby = $this->get_str_if_isset($set_val, 'orderby');
-			$order = $this->get_str_if_isset($set_val, 'order');
+		$q_vals = $this->get_appropriate_sort_query_val($qry, $this->ordby_request_key);
+		if( $this->is_valid_arr($q_vals) ){
+			$odby = $this->get_if_isset($q_vals, 'orderby');
+			if( is_array($odby) ){
+				$q_args['orderby'] = $odby;
+			} elseif( is_string($odby) ){
+				$q_args['orderby'] = $odby;
+				$q_args['order'] = $this->get_str_if_isset($q_vals, 'order');
+			}
+			if( isset($q_args['orderby'], $q_vals['meta_key']) ){
+				$q_args['meta_key'] = (string)$q_vals['meta_key'];
+				if( isset($q_vals['meta_type']) ) $q_args['meta_type'] = (string)$q_vals['meta_type'];
+			}
+		}
 
-			$ordby = explode('/', $ordby);
-			if( 'meta' === $ordby[0] && isset($ordby[1]) ){
-
-				$meta_type = $this->get_str_if_isset($set_val, 'meta_type');
-				$meta_type = ( $meta_type ) ? $meta_type : 'NUMERIC';
-				$this->set_query_meta_orderby($qry, $ordby[1], $order, $meta_type);
-
-			} else {
-
-				$qry->set('orderby', $ordby[0]);
-				$qry->set('order', $order);
-
+		if( $q_args ){
+			foreach( $q_args as $k => $v ){
+				$qry->set($k, $v);
 			}
 		}
 	}
@@ -424,19 +427,8 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 		$cmpnts = $this->get_the_sort_components($key);
 		if( !is_array($cmpnts) || !isset($cmpnts[0]) ) return NULL;
 
-		$q_val = (int)$qry->get($key, 0);
-		return isset($cmpnts[$q_val]) ? $cmpnts[$q_val] : $cmpnts[0];
-	}
-
-	protected function set_query_meta_orderby($qry, $ordby, $order, $meta_type){
-		if( !$this->is_wp_query($qry) ) return false;
-
-		$meta_key = $ordby;
-
-		$qry->set('meta_key', $meta_key);
-		$qry->set('meta_type', $meta_type);
-		$qry->set('orderby', 'meta_value');
-		$qry->set('order', $order);
+		$q_index = (int)$qry->get($key, 0);
+		return isset($cmpnts[$q_index]) ? $cmpnts[$q_index] : $cmpnts[0];
 	}
 
 /*******************************************************/
@@ -754,6 +746,9 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 			'li' => array(), 
 			'a' => array(), 
 		), $this->get_arr_if_isset($args, 'class_arr') );
+		foreach( $cls_arr as $k => $v ){
+			$cls_arr[$k] = is_array($v) ? $v : array($v);
+		}
 
 		$tax_slug = $this->get_the_tax_slug_by_component_key($cmpnt_key);
 		if( $tax_slug ) $cls_arr['li'][] = $tax_slug;
@@ -868,7 +863,6 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 			$req_key = $this->make_appropriate_request_key($cpk);
 			$search_url = add_query_arg($req_key, $cpv, $search_url);
 		}
-
 		$search_url = $this->convert_search_or_sort_query_url($search_url);
 		$search_url = preg_replace( "/\[\d+\]/u", '[]', urldecode($search_url) );
 		return $search_url;
@@ -879,7 +873,7 @@ abstract class Model extends \Mylib\Base\FunctionsWP {
 	}
 
 	protected function make_appropriate_input_url($cmpnt_key, $ipt_val){
-		return esc_url( $this->make_appropriate_search_url($cmpnt_key, $ipt_val, true) );
+		return esc_url_raw( $this->make_appropriate_search_url($cmpnt_key, $ipt_val, true) );
 	}
 
 	protected function is_multi_arg_input_type($type){

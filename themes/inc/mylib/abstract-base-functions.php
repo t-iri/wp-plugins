@@ -58,7 +58,7 @@ abstract class Functions {
 
 	protected function make_attr($attr, $str=''){
 		if( is_string($attr) ){
-			if( is_array($str) ) $str = implode( ' ', array_filter($str) );
+			if( is_array($str) ) $str = implode( ' ', array_filter($str, 'strlen') );
 			return sprintf( ' %s="%s"', $attr, htmlspecialchars($str, ENT_QUOTES) );
 		}
 		$single_str = '';
