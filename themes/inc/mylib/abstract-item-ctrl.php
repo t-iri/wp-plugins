@@ -20,12 +20,6 @@ abstract class MyUscesItemCtrlAbstract {
 		), 
 	);
 
-	protected $rewrite_vars = array(
-		'rule' => array(), 
-		'query_var' => array(), 
-		'init_flush' => false, //be careful to set true
-	);
-
 	protected $item_category_id;
 	protected $search_metas = array(
 		'_itemCode', 
@@ -58,7 +52,6 @@ abstract class MyUscesItemCtrlAbstract {
 		$this->activate_item_taxonomies();
 		$this->activate_archive_item_posts();
 		$this->activate_item_template();
-		$this->activate_url_rewrite();
 		$this->activate_replace_wp_link();
 		$this->activate_item_search();
 		$this->activate_uneditable_csmb_keys();
@@ -635,51 +628,6 @@ abstract class MyUscesItemCtrlAbstract {
 
 	protected function get_item_template(){
 		return get_stylesheet_directory() . '/' . $this->item_archive_template_name;
-	}
-
-/******************************/
-
-	protected function activate_url_rewrite(){
-		add_filter('init', array($this, 'url_rewrite_flush'));
-		add_filter('rewrite_rules_array', array($this, 'url_rewrite_rule'));
-		add_filter('query_vars', array($this, 'url_rewrite_add_vars'));
-	}
-
-	function url_rewrite_flush(){
-		$init_flush = $this->get_rewrite_vars('init_flush');
-		if( true === $init_flush ){
-			global $wp_rewrite;
-			$wp_rewrite->flush_rules();
-		}
-	}
-
-	function url_rewrite_rule($rules){
-		$newrules = $this->get_rewrite_vars('rule');
-		$newrules = is_array($newrules) ? $newrules : array();
-		return $newrules + $rules;
-	}
-
-	function url_rewrite_add_vars($vars){
-		$query_vars = $this->get_rewrite_vars('query_var');
-		$query_vars = is_array($query_vars) ? $query_vars : array();
-		if( $query_vars ){
-			foreach($query_vars as $qv){
-				$qv = (string)$qv;
-				if( '' !== $qv ){
-					array_push($vars, $qv);
-				}
-			}
-		}
-		return $vars;
-	}
-
-	protected function get_rewrite_vars($key=''){
-		$vars = $this->rewrite_vars;
-		$key = (string)$key;
-		if( '' !== $key ){
-			$vars = isset($vars[$key]) ? $vars[$key] : NULL;
-		}
-		return $vars;
 	}
 
 /******************************/
