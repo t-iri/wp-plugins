@@ -1,5 +1,10 @@
 <?php 
-abstract class MyUscesItemCtrlAbstract {
+namespace Mylib\Usces;
+
+require_once( dirname(__FILE__) . '/abstract-base-functions-wp.php' );
+if( !class_exists('\Mylib\Base\FunctionsWP') ) return;
+
+abstract class ItemGreaser extends \Mylib\Base\FunctionsWP {
 	protected $item_taxonomies = array();
 	protected $item_archive_template_name = '';
 	protected $replace_term_slugs = array(
@@ -72,22 +77,6 @@ abstract class MyUscesItemCtrlAbstract {
 		return $this->is_wp_term($cat) ? $cat : array();
 	}
 
-	protected function find_the_term_in($presumed_query, $id_key, $slug_key, $tax_name){
-		if( is_numeric($presumed_query) ){
-			return get_term_by('term_id', (int)$presumed_query, $tax_name);
-		}
-
-		global $wp_query;
-		$qry = $this->is_wp_query($presumed_query) ? $presumed_query : $wp_query;
-		$term_id = (int)$qry->get($id_key, 0);
-		if( $term_id ){
-			return get_term_by('term_id', $term_id, $tax_name);
-		}
-
-		$assumed_slug = basename( $qry->get($slug_key, '') );
-		return get_term_by('slug', $assumed_slug, $tax_name);
-	}
-
 	protected function is_cat_of_item($presumed_query=NULL){
 		if( !function_exists('usces_is_cat_of_item') ) return false;
 
@@ -105,18 +94,6 @@ abstract class MyUscesItemCtrlAbstract {
 	protected function own_filter_is_tag_of_item($tag_obj){
 	//define at your instance
 		return false;
-	}
-
-	protected function is_wp_term($obj){
-		return (bool)( is_object($obj) && $obj instanceof WP_Term );
-	}
-
-	protected function is_wp_query($obj){
-		return (bool)( is_object($obj) && $obj instanceof WP_Query );
-	}
-
-	protected function is_wp_post($obj){
-		return (bool)( is_object($obj) && $obj instanceof WP_Post );
 	}
 
 	protected function is_usces_item_post($post){
@@ -139,29 +116,12 @@ abstract class MyUscesItemCtrlAbstract {
 		return (bool)( is_single() && usces_is_item() );
 	}
 
-	protected function is_the_tax_archive($tax, $q=NULL){
-		if( 'category' === $tax ) return $this->is_wp_query($q) ? $q->is_category() : is_category();
-		if( 'post_tag' === $tax ) return $this->is_wp_query($q) ? $q->is_tag() : is_tag();
-		return $this->is_wp_query($q) ? $q->is_tax($tax) : is_tax($tax);
-	}
-
-	protected function is_the_term_archive($tax, $term, $q=NULL){
-		if( 'category' === $tax ) return $this->is_wp_query($q) ? $q->is_category($term) : is_category($term);
-		if( 'post_tag' === $tax ) return $this->is_wp_query($q) ? $q->is_tag($term) : is_tag($term);
-		return $this->is_wp_query($q) ? $q->is_tax($tax, $term) : is_tax($tax, $term);
-	}
-
 	protected function is_item_tax($q=NULL){
 		$taxes = $this->item_taxonomies;
 		if( $this->is_wp_query($q) ){
 			return (bool)( $taxes && $q->is_tax($taxes) );
 		}
 		return (bool)( $taxes && is_tax($taxes) );
-	}
-
-	protected function is_catchable_global_post(){
-		global $post;
-		return $this->is_wp_post($post);
 	}
 
 	protected function is_admin_usces_item_page($suffix=''){
@@ -898,40 +858,6 @@ abstract class MyUscesItemCtrlAbstract {
 			}
 		}
 		return $msg_body;
-	}
-
-/*************** utility ***************/
-	protected function get_str_if_isset($args, $key){
-		return $this->get_if_isset($args, $key, 'string');
-	}
-	protected function get_arr_if_isset($args, $key){
-		return $this->get_if_isset($args, $key, 'array');
-	}
-	protected function get_int_if_isset($args, $key){
-		return $this->get_if_isset($args, $key, 'integer');
-	}
-	protected function get_float_if_isset($args, $key){
-		return $this->get_if_isset($args, $key, 'float');
-	}
-	protected function get_num_if_isset($args, $key){
-		$val = $this->get_str_if_isset($args, $key);
-		return is_numeric($val) ? $val : '0';
-	}
-	protected function get_if_isset($args, $key, $fmt=''){
-		$val = ( is_array($args) && isset($args[$key]) ) ? $args[$key] : NULL;
-		if( '' !== (string)$fmt ) settype($val, $fmt);
-		return $val;
-	}
-
-	protected function search_arr_val_deeply($arr, $key){
-		if( is_string($key) ) $key = explode('/', $key);
-		if( !is_array($key) ) $key = array($key);
-		if( !is_array($arr) || !$key ) return false;
-
-		foreach( $key as $k ){
-			$arr = ( is_array($arr) && isset($arr[$k]) ) ? $arr[$k] : NULL;
-		}
-		return $arr;
 	}
 
 }
