@@ -33,21 +33,15 @@ abstract class FunctionsWP extends Functions {
 	}
 
 	protected function is_the_tax_archive($tax, $q=NULL){
-		if( $this->is_wp_query($q) ){
-			$is_tax = ( $tax !== 'category' ) ? ( ( $tax !== 'post_tag' ) ? $q->is_tax($tax) : $q->is_tag() ) : $q->is_category();
-		} else {
-			$is_tax = ( $tax !== 'category' ) ? ( ( $tax !== 'post_tag' ) ? is_tax($tax) : is_tag() ) : is_category();
-		}
-		return (bool)$is_tax;
+		if( 'category' === $tax ) return $this->is_wp_query($q) ? $q->is_category() : is_category();
+		if( 'post_tag' === $tax ) return $this->is_wp_query($q) ? $q->is_tag() : is_tag();
+		return $this->is_wp_query($q) ? $q->is_tax($tax) : is_tax($tax);
 	}
 
 	protected function is_the_term_archive($tax, $term, $q=NULL){
-		if( $this->is_wp_query($q) ){
-			$is_term = ( $tax !== 'category' ) ? ( ( $tax !== 'post_tag' ) ? $q->is_tax($tax, $term) : $q->is_tag($term) ) : $q->is_category($term);
-		} else {
-			$is_term = ( $tax !== 'category' ) ? ( ( $tax !== 'post_tag' ) ? is_tax($tax, $term) : is_tag($term) ) : is_category($term);
-		}
-		return (bool)$is_term;
+		if( 'category' === $tax ) return $this->is_wp_query($q) ? $q->is_category($term) : is_category($term);
+		if( 'post_tag' === $tax ) return $this->is_wp_query($q) ? $q->is_tag($term) : is_tag($term);
+		return $this->is_wp_query($q) ? $q->is_tax($tax, $term) : is_tax($tax, $term);
 	}
 
 	protected function term_is_self_or_ancestor_of($base_term, $check_term, $taxonomy){
@@ -136,6 +130,23 @@ abstract class FunctionsWP extends Functions {
 			$obj = get_queried_object();
 		}
 		return $obj;
+	}
+
+/*************** WP Query ***************/
+	protected function find_the_term_in($presumed_query, $id_key, $slug_key, $tax_name){
+		if( is_numeric($presumed_query) ){
+			return get_term_by('term_id', (int)$presumed_query, $tax_name);
+		}
+
+		global $wp_query;
+		$qry = $this->is_wp_query($presumed_query) ? $presumed_query : $wp_query;
+		$term_id = (int)$qry->get($id_key, 0);
+		if( $term_id ){
+			return get_term_by('term_id', $term_id, $tax_name);
+		}
+
+		$assumed_slug = basename( $qry->get($slug_key, '') );
+		return get_term_by('slug', $assumed_slug, $tax_name);
 	}
 
 /*************** Tree Root Taxonomy ***************/
